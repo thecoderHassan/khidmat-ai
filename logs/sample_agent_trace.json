@@ -1,1 +1,42 @@
-{"agent":"RecommendationAgent"}
+[
+  {
+    "session_id": "SES-20250515-001",
+    "timestamp": "2025-05-15T10:23:41Z",
+    "agent": "IntentAgent", "step": 1,
+    "input": { "message": "Mujhe kal subah G-13 mein AC technician chahiye" },
+    "reasoning": "Detected Roman Urdu. Extracted service_type=AC Technician, location=G-13, time=tomorrow morning.",
+    "tools_used": ["gemini_api"],
+    "output": { "service_type": "AC Technician", "location": "G-13", "time": "tomorrow morning", "language": "roman_urdu" },
+    "duration_ms": 410
+  },
+  {
+    "session_id": "SES-20250515-001",
+    "timestamp": "2025-05-15T10:23:42Z",
+    "agent": "DiscoveryAgent", "step": 2,
+    "input": { "service_type": "AC Technician", "location": "G-13" },
+    "reasoning": "Filtered providers.json for AC Technician. Found 3 providers. Used Maps Distance Matrix for distances.",
+    "tools_used": ["providers_json", "google_maps_distance_matrix"],
+    "output": { "providers_found": 3 },
+    "duration_ms": 289
+  },
+  {
+    "session_id": "SES-20250515-001",
+    "timestamp": "2025-05-15T10:23:43Z",
+    "agent": "RecommendationAgent", "step": 3,
+    "input": { "providers_found": 3 },
+    "reasoning": "Ali AC Services scored 0.96 — closest (2.1km), highest rating (4.8), available.",
+    "tools_used": ["ranking_algorithm"],
+    "output": { "selected_provider": "PRV-001", "score": 0.96 },
+    "duration_ms": 95
+  },
+  {
+    "session_id": "SES-20250515-001",
+    "timestamp": "2025-05-15T10:23:44Z",
+    "agent": "BookingAgent", "step": 4,
+    "input": { "provider_id": "PRV-001", "requested_time": "tomorrow morning" },
+    "reasoning": "First morning slot is 10:00. Wrote to bookings.json. Generated receipt.",
+    "tools_used": ["bookings_json_write"],
+    "output": { "booking_id": "BK-2025-00142", "confirmed_slot": "10:00 AM" },
+    "duration_ms": 134
+  }
+]
