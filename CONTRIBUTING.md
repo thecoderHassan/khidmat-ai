@@ -53,13 +53,13 @@ wip: booking agent — slot selection half done
 
 | File / Folder | Owner |
 |---|---|
-| `backend/agents/intent.py` | [Assign team member] |
-| `backend/agents/discovery.py` | [Assign team member] |
-| `backend/agents/recommendation.py` | [Assign team member] |
-| `backend/agents/booking.py` | [Assign team member] |
-| `mobile/screens/` | [Assign team member] |
-| `backend/data/providers.json` | [Assign team member] |
-| `antigravity/` | [Assign team member] |
+| `backend/agents/intent.py` | [Assign to abdur rahman & samiullah] |
+| `backend/agents/discovery.py` | [Assign to abdur rahman & samiullah] |
+| `backend/agents/recommendation.py` | [Assign to abdur rahman & samiullah] |
+| `backend/agents/booking.py` | [Assign to abdur rahman & samiullah] |
+| `mobile/screens/` | [Assign to aqib] |
+| `backend/data/providers.json` | [Assign to me] |
+| `antigravity/` | [Assign me] |
 
 ## Rules
 
