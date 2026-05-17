@@ -54,7 +54,6 @@ def run(input_data: dict) -> dict:
 
     # Step 1 — filter by service category and availability
     service_lower = service_type.lower()
-    requested_hour = time_iso[11:16] if time_iso else None  # "HH:MM"
 
     matched = []
     for p in all_providers:
@@ -62,12 +61,11 @@ def run(input_data: dict) -> dict:
             continue
         if not p.get("available", False):
             continue
-        # If we have a requested time, keep only providers with a slot at or after it
-        if requested_hour:
-            slots = p.get("available_slots", [])
-            p["matched_slot"] = next((s for s in slots if s >= requested_hour), slots[0] if slots else None)
+        slots = p.get("available_slots", [])
+        if time_iso:
+            # slots are full ISO strings — find first slot at or after requested time
+            p["matched_slot"] = next((s for s in slots if s >= time_iso), slots[0] if slots else None)
         else:
-            slots = p.get("available_slots", [])
             p["matched_slot"] = slots[0] if slots else None
         matched.append(p)
 
