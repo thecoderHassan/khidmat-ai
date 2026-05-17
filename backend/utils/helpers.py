@@ -39,8 +39,8 @@ def normalize_time(time_preference: str | None, reference: datetime | None = Non
 
     if not time_preference:
         # Default: tomorrow morning
-        target = now + timedelta(days=1)
-        return target.strftime("%Y-%m-%d 09:00")
+        target = (now + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+        return target.strftime("%Y-%m-%dT%H:%M:%S")
 
     tokens = time_preference.lower().split()
 
@@ -67,9 +67,9 @@ def normalize_time(time_preference: str | None, reference: datetime | None = Non
         # Round up to next full hour
         target = now + timedelta(hours=1)
         target = target.replace(minute=0, second=0, microsecond=0)
-        return target.strftime("%Y-%m-%d %H:%M")
+        return target.strftime("%Y-%m-%dT%H:%M:%S")
 
     target = (now + timedelta(days=day_offset)).replace(
         hour=hour, minute=0, second=0, microsecond=0
     )
-    return target.strftime("%Y-%m-%d %H:%M")
+    return target.strftime("%Y-%m-%dT%H:%M:%S")
