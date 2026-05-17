@@ -10,7 +10,12 @@ test_messages = [
 ]
 
 for msg in test_messages:
-    print(f"\nInput:  {msg}")
+    safe_msg = msg.encode("ascii", errors="replace").decode("ascii")
+    print(f"\nInput:  {safe_msg}")
     result = run({"message": msg, "session_id": "TEST-001"})
-    print(f"Output: {result}")
+    print(f"  service_type:      {result.get('service_type')}")
+    print(f"  location:          {result.get('location')}")
+    print(f"  time_preference:   {result.get('time_preference')}")
+    print(f"  time_iso:          {result.get('time_iso')}")
+    print(f"  language_detected: {result.get('language_detected')}")
     print("-" * 60)

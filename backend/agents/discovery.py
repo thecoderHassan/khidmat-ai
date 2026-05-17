@@ -1,7 +1,8 @@
 """
 Agent 2 — Discovery Agent
-Filters providers.json by service type and computes distance from requested location.
-Returns all matching available providers with distance attached.
+Filters providers.json by service type, computes distance from the
+requested location, ranks the matches with utils.ranking, and returns a
+`top_match` plus ranked `alternatives` for the app to display.
 """
 
 import json
@@ -12,7 +13,13 @@ from pathlib import Path
 from utils.maps import get_area_coords, haversine_km
 from utils.logger import write_trace
 
+from agents.ranking import rank_providers
+
 PROVIDERS_FILE = Path(__file__).parent.parent / "data" / "providers.json"
+
+# Display fields exposed to the app for each provider card.
+_CARD_FIELDS = ("provider_id", "name", "distance_km", "rating", "total_reviews",
+                "matched_slot", "score", "price_range", "phone")
 
 
 def _load_providers() -> list[dict]:
@@ -20,23 +27,53 @@ def _load_providers() -> list[dict]:
         return json.load(f)
 
 
+def _match_slot(slots: list[str], time_iso: str | None) -> str | None:
+    """
+    Pick the first slot at or after the requested time, else the earliest.
+
+    Handles full ISO slots ("2026-05-18T09:00:00") and legacy time-only
+    slots ("09:00") so discovery works before and after Sami's
+    providers.json update.
+    """
+    if not slots:
+        return None
+    ordered = sorted(slots)
+    if not time_iso:
+        return ordered[0]
+    if "T" not in ordered[0]:
+        # legacy time-only slots — compare on the HH:MM portion only
+        req = time_iso.split("T")[1][:5] if "T" in time_iso else time_iso[:5]
+        return next((s for s in ordered if s >= req), ordered[0])
+    return next((s for s in ordered if s >= time_iso), ordered[0])
+
+
+def _to_card(provider: dict) -> dict:
+    """Project a scored provider into the slim card the app renders."""
+    card = {f: provider.get(f) for f in _CARD_FIELDS}
+    card["area"] = provider.get("location", {}).get("area")
+    return card
+
+
 def run(input_data: dict) -> dict:
     """
     Entry point called by the Antigravity pipeline.
 
     Args:
-        input_data: {
-            "service_type": "AC Technician",
-            "location": "G-13",
-            "time_preference": "Tomorrow morning",
-            "session_id": "SES-001"
-        }
+        input_data: Agent 1 (Intent) output —
+            {
+                "service_type": "AC Technician",
+                "location": "G-13",
+                "time_iso": "2026-05-18T09:00:00",
+                "session_id": "SES-001"
+            }
 
     Returns:
         {
-            "providers": [ { ...provider fields..., "distance_km": 2.1 } ],
+            "top_match": { ...card with score... } | None,
+            "alternatives": [ { ...card... }, ... ],
             "service_type": "AC Technician",
             "location": "G-13",
+            "time_iso": "2026-05-18T09:00:00",
             "session_id": "SES-001"
         }
     """
@@ -44,66 +81,74 @@ def run(input_data: dict) -> dict:
 
     service_type = input_data.get("service_type", "")
     location = input_data.get("location", "")
-    time_iso = input_data.get("time_iso")          # e.g. "2026-05-18 09:00"
+    time_iso = input_data.get("time_iso")
     session_id = input_data.get("session_id", f"SES-{datetime.now().strftime('%Y%m%d-%H%M%S')}")
 
     if not service_type:
         raise ValueError("input_data must contain 'service_type'")
 
     all_providers = _load_providers()
-
-    # Step 1 — filter by service category and availability
     service_lower = service_type.lower()
 
+    # Step 1 — filter by service category and availability
     matched = []
     for p in all_providers:
         if not any(cat.lower() == service_lower for cat in p.get("service_categories", [])):
             continue
         if not p.get("available", False):
             continue
-        slots = p.get("available_slots", [])
-        if time_iso:
-            # slots are full ISO strings — find first slot at or after requested time
-            p["matched_slot"] = next((s for s in slots if s >= time_iso), slots[0] if slots else None)
-        else:
-            p["matched_slot"] = slots[0] if slots else None
+        p["matched_slot"] = _match_slot(p.get("available_slots", []), time_iso)
         matched.append(p)
 
     # Step 2 — attach distance_km
-    origin = get_area_coords(location)
-
+    origin = get_area_coords(location) if location else None
     for provider in matched:
         loc = provider.get("location", {})
         plat, plng = loc.get("lat"), loc.get("lng")
-        if origin and plat and plng:
+        if origin and plat is not None and plng is not None:
             provider["distance_km"] = haversine_km(origin[0], origin[1], plat, plng)
         else:
-            # location unknown — use large sentinel so it sorts last
+            # location unknown — large sentinel so it sorts/scores last
             provider["distance_km"] = 999.0
 
-    # Step 3 — sort by distance so the list is ordered (Recommendation Agent re-ranks with score)
-    matched.sort(key=lambda p: p["distance_km"])
+    # Step 3 — score and rank (best first)
+    ranked = rank_providers(matched)
+    cards = [_to_card(p) for p in ranked]
+    top_match = cards[0] if cards else None
+    alternatives = cards[1:]
 
     duration_ms = int((time.time() - start) * 1000)
+
+    if top_match:
+        reasoning = (
+            f"Filtered {len(all_providers)} providers -> {len(matched)} available "
+            f"{service_type} provider(s). Top match: {top_match['name']} "
+            f"(score {top_match['score']}, {top_match['distance_km']}km)."
+        )
+    else:
+        reasoning = (
+            f"Filtered {len(all_providers)} providers -> no available "
+            f"{service_type} providers found."
+        )
 
     write_trace({
         "session_id": session_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "agent": "DiscoveryAgent",
         "step": 2,
-        "input": {"service_type": service_type, "location": location},
-        "reasoning": (
-            f"Filtered {len(all_providers)} providers → {len(matched)} available "
-            f"{service_type} providers. "
-            + (f"Distances computed from {location}." if origin else f"Location '{location}' not in lookup — sorted by proximity to provider area.")
-        ),
-        "tools_used": ["providers_json", "haversine_distance"],
-        "output": {"providers_found": len(matched)},
+        "input": {"service_type": service_type, "location": location, "time_iso": time_iso},
+        "reasoning": reasoning,
+        "tools_used": ["providers_json", "haversine_distance", "ranking"],
+        "output": {
+            "providers_found": len(matched),
+            "top_match": top_match["provider_id"] if top_match else None,
+        },
         "duration_ms": duration_ms,
     })
 
     return {
-        "providers": matched,
+        "top_match": top_match,
+        "alternatives": alternatives,
         "service_type": service_type,
         "location": location,
         "time_iso": time_iso,
