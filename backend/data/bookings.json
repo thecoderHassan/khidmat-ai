@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "booking_id": "BK-20260517-00001",
+    "session_id": "E2E-001",
+    "provider_id": "PRV-001",
+    "provider_name": "Ali AC Services",
+    "service_type": "AC Technician",
+    "confirmed_slot": "09:00",
+    "provider_phone": "+92-300-0000001",
+    "price_range": "PKR 500-1500",
+    "area": "G-13",
+    "booked_at": "2026-05-17T18:57:45.287910+00:00"
+  }
+]
