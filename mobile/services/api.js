@@ -10,6 +10,7 @@ const api = axios.create({
   timeout: 10000, // Reduced from 30s to 10s for faster local fallback response
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
