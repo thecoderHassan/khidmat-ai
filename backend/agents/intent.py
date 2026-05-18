@@ -207,4 +207,8 @@ def run(input_data: dict) -> dict:
 
     result["time_iso"] = normalize_time(result.get("time_preference"))
     result["session_id"] = session_id
+    
     return result
+
+def extract_intent(message: str, session_id: str) -> dict:
+    return run({"message": message, "session_id": session_id})

@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+.git/
+.gitignore
+.idea/
+.vscode/
+tests/
+*.md
+!README.md
+logs/*.json
+data/bookings.json
+.pytest_cache/
+.coverage
