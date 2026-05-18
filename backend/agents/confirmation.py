@@ -16,8 +16,10 @@ PROVIDERS_FILE = Path(__file__).parent.parent / "data" / "providers.json"
 
 
 def _load_providers() -> list[dict]:
+    """Return the provider list from Sami's {"providers": [...]} file."""
     with open(PROVIDERS_FILE, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    return data["providers"]
 
 
 def _slot_time(slot: str | None) -> str:
@@ -65,7 +67,7 @@ def run(input_data: dict) -> dict:
         raise ValueError("input_data must contain 'provider_id'")
 
     provider = next(
-        (p for p in _load_providers() if p.get("provider_id") == provider_id), None
+        (p for p in _load_providers() if p.get("id") == provider_id), None
     )
     if provider is None:
         raise ValueError(f"No provider found with provider_id '{provider_id}'")
@@ -87,7 +89,7 @@ def run(input_data: dict) -> dict:
     name = provider.get("name", provider_id)
     rating = provider.get("rating")
     reviews = provider.get("total_reviews")
-    area = provider.get("location", {}).get("area")
+    area = provider.get("area")
     distance_km = input_data.get("distance_km")   # optional, from discovery card
 
     details = []
