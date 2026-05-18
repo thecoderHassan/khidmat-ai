@@ -1,0 +1,22 @@
+[
+  {
+    "session_id": "sess-17bdd30a91a5",
+    "timestamp": "2026-05-18T07:35:54.427788+00:00",
+    "agent": "IntentAgent",
+    "step": 1,
+    "input": {
+      "message": "bijli ka masla hai ghar mein F-7 area"
+    },
+    "reasoning": "Detected Roman Urdu. Extracted service_type=Electrician, location=F-7, time=None.",
+    "tools_used": [
+      "gemini_api"
+    ],
+    "output": {
+      "service_type": "Electrician",
+      "location": "F-7",
+      "time_preference": null,
+      "language_detected": "Roman Urdu"
+    },
+    "duration_ms": 2554
+  }
+]

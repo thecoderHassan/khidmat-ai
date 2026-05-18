@@ -154,3 +154,7 @@ def run(input_data: dict) -> dict:
         "time_iso": time_iso,
         "session_id": session_id,
     }
+def discover_and_rank(intent: dict, providers: list, user_lat: float, user_lng: float) -> dict:
+    intent["user_lat"] = user_lat
+    intent["user_lng"] = user_lng
+    return run(intent)

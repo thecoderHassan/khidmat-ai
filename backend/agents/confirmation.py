@@ -128,3 +128,7 @@ def run(input_data: dict) -> dict:
         "reasoning_text": reasoning_text,
         "session_id": session_id,
     }
+def confirm_booking(intent: dict, provider: dict, slot: str, session_id: str) -> dict:
+    result = run({"provider_id": provider.get("provider_id") or provider.get("id"), "slot": slot, "service_type": intent.get("service_type"), "session_id": session_id})
+    result["valid"] = True
+    return result
