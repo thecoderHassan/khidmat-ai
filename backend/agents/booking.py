@@ -15,18 +15,24 @@ BOOKINGS_FILE = Path(__file__).parent.parent / "data" / "bookings.json"
 
 
 def _load_bookings() -> list[dict]:
+    """Return the bookings list from Sami's {"bookings": [...]} file."""
     if not BOOKINGS_FILE.exists():
         return []
     with open(BOOKINGS_FILE, encoding="utf-8") as f:
         try:
-            return json.load(f)
+            data = json.load(f)
         except json.JSONDecodeError:
             return []
+    if isinstance(data, dict):
+        return data.get("bookings", [])
+    # tolerate a legacy bare-array file
+    return data if isinstance(data, list) else []
 
 
 def _save_bookings(bookings: list[dict]) -> None:
+    """Persist bookings under Sami's {"bookings": [...]} schema."""
     with open(BOOKINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(bookings, f, indent=2, ensure_ascii=False)
+        json.dump({"bookings": bookings}, f, indent=2)
 
 
 def _humanize_slot(slot: str | None) -> tuple[str | None, str]:
@@ -97,7 +103,7 @@ def run(input_data: dict) -> dict:
     provider_name = provider.get("name", "Provider")
     provider_phone = provider.get("phone", "N/A")
     price_range = provider.get("price_range", "N/A")
-    area = provider.get("location", {}).get("area", "your location")
+    area = provider.get("area", "your location")
 
     # Assign a booking ID: BK-<slot date>-<5-digit running sequence>
     bookings = _load_bookings()
@@ -113,7 +119,7 @@ def run(input_data: dict) -> dict:
     record = {
         "booking_id": booking_id,
         "session_id": session_id,
-        "provider_id": provider.get("provider_id"),
+        "provider_id": provider.get("id"),
         "provider_name": provider_name,
         "service_type": service_type,
         "confirmed_slot": confirmed_slot,
@@ -132,7 +138,7 @@ def run(input_data: dict) -> dict:
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "agent": "BookingAgent",
         "step": 4,
-        "input": {"provider_id": provider.get("provider_id"), "confirmed_slot": confirmed_slot},
+        "input": {"provider_id": provider.get("id"), "confirmed_slot": confirmed_slot},
         "reasoning": (
             f"Confirmed booking {booking_id} with {provider_name} "
             f"for {service_type} {when}."
