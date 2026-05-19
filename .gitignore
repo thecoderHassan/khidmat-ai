@@ -1,31 +1,56 @@
-# Python
+# ── Environment & Secrets ──────────────────────────────────────────
+.env
+.env.local
+.env.production
+*.key
+*.pem
+service-account.json
+google-credentials.json
+
+# ── Python (Backend) ────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
-*.so
+*.pyo
+*.pyd
 .Python
 venv/
+env/
 .venv/
+dist/
+build/
 *.egg-info/
 .pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
 
-# Environment
-.env
-
-# IDE
-.idea/
-.vscode/
-.DS_Store
-
-# Runtime data (never commit — generated per request)
-**/logs/
-**/logs/*.json
-backend/data/bookings.json
-
-# Backup folders
-**/app.backup/
-**/backend-backup/
-
-# Node (Aqib's mobile)
+# ── React Native + Expo (Mobile) ────────────────────────────────────
 node_modules/
 .expo/
+.expo-shared/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*.orig.*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# ── IDE & OS ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────────────────
+logs/*.json
+!logs/sample_agent_trace.json
 *.log
+
+# ── Google Cloud ────────────────────────────────────────────────────
+.gcloud/
