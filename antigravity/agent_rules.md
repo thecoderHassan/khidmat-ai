@@ -7,7 +7,7 @@ Stack: Python + FastAPI (backend) · React Native + Expo (mobile) · Gemini API 
 ## Agent Pipeline Order
 1. Intent Agent          → backend/agents/intent.py
 2. Discovery Agent       → backend/agents/discovery.py
-3. Recommendation Agent  → backend/agents/recommendation.py
+3. Confirmation Agent    → backend/agents/confirmation.py
 4. Booking Agent         → backend/agents/booking.py
 
 ## Rules for All Agents

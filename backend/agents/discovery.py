@@ -17,14 +17,11 @@ from agents.ranking import rank_providers
 
 PROVIDERS_FILE = Path(__file__).parent.parent / "data" / "providers.json"
 
-# Display fields exposed to the app for each provider card.
-_CARD_FIELDS = ("provider_id", "name", "distance_km", "rating", "total_reviews",
-                "matched_slot", "score", "price_range", "phone")
-
-
 def _load_providers() -> list[dict]:
+    """Return the provider list from Sami's {"providers": [...]} file."""
     with open(PROVIDERS_FILE, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    return data["providers"]
 
 
 def _match_slot(slots: list[str], time_iso: str | None) -> str | None:
@@ -48,10 +45,22 @@ def _match_slot(slots: list[str], time_iso: str | None) -> str | None:
 
 
 def _to_card(provider: dict) -> dict:
-    """Project a scored provider into the slim card the app renders."""
-    card = {f: provider.get(f) for f in _CARD_FIELDS}
-    card["area"] = provider.get("location", {}).get("area")
-    return card
+    """Project a scored provider into the slim card the app renders.
+
+    `provider_id` is sourced from Sami's `id` field; `area`/`lat`/`lng`
+    are flat on the provider object.
+    """
+    return {
+        "provider_id": provider.get("id"),
+        "name": provider.get("name"),
+        "area": provider.get("area"),
+        "distance_km": provider.get("distance_km"),
+        "rating": provider.get("rating"),
+        "matched_slot": provider.get("matched_slot"),
+        "score": provider.get("score"),
+        "price_range": provider.get("price_range"),
+        "phone": provider.get("phone"),
+    }
 
 
 def run(input_data: dict) -> dict:
@@ -88,12 +97,11 @@ def run(input_data: dict) -> dict:
         raise ValueError("input_data must contain 'service_type'")
 
     all_providers = _load_providers()
-    service_lower = service_type.lower()
 
     # Step 1 — filter by service category and availability
     matched = []
     for p in all_providers:
-        if not any(cat.lower() == service_lower for cat in p.get("service_categories", [])):
+        if service_type not in p.get("service_categories", []):
             continue
         if not p.get("available", False):
             continue
@@ -103,8 +111,7 @@ def run(input_data: dict) -> dict:
     # Step 2 — attach distance_km
     origin = get_area_coords(location) if location else None
     for provider in matched:
-        loc = provider.get("location", {})
-        plat, plng = loc.get("lat"), loc.get("lng")
+        plat, plng = provider.get("lat"), provider.get("lng")
         if origin and plat is not None and plng is not None:
             provider["distance_km"] = haversine_km(origin[0], origin[1], plat, plng)
         else:

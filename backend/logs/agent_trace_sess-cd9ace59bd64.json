@@ -1,0 +1,53 @@
+[
+  {
+    "agent": "agent_2_discovery",
+    "step": "rank",
+    "timestamp": "2026-05-18T15:58:06.565073+00:00",
+    "input": {
+      "service_type": "AC Technician",
+      "candidates": 3
+    },
+    "output": {
+      "top_id": "P002",
+      "alt_count": 2
+    },
+    "reasoning": "Weighted: 0.40 proximity + 0.40 rating + 0.20 availability",
+    "tool_used": "haversine_distance",
+    "tools_available": [
+      "haversine_distance",
+      "google_maps_distance_matrix"
+    ]
+  },
+  {
+    "agent": "agent_3_confirmation",
+    "step": "validate",
+    "timestamp": "2026-05-18T15:58:29.839085+00:00",
+    "input": {
+      "provider_id": "P002",
+      "slot": "2026-05-17T13:00:00+00:00"
+    },
+    "output": {
+      "valid": true
+    },
+    "reasoning": "Slot 2026-05-17T13:00:00+00:00 is available with Ali AC Solutions.",
+    "tool_used": "slot_availability_check"
+  },
+  {
+    "agent": "agent_4_booking",
+    "step": "create",
+    "timestamp": "2026-05-18T15:58:29.852108+00:00",
+    "input": {
+      "provider_id": "P002",
+      "slot": "2026-05-17T13:00:00+00:00"
+    },
+    "output": {
+      "booking_id": "BK-20260518-79A46"
+    },
+    "reasoning": "Booking persisted to bookings.json",
+    "tool_used": "json_file_writer",
+    "tools_available": [
+      "json_file_writer",
+      "firestore_writer"
+    ]
+  }
+]

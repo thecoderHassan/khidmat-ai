@@ -4,6 +4,7 @@ import ChatScreen from "./screens/ChatScreen";
 import AgentThinkingScreen from "./screens/AgentThinkingScreen";
 import ProviderResultsScreen from "./screens/ProviderResultsScreen";
 import BookingConfirmScreen from "./screens/BookingConfirmScreen";
+import AgentTraceScreen from "./screens/AgentTraceScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -30,6 +31,7 @@ export default function App() {
         <Stack.Screen name="AgentThinking" component={AgentThinkingScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ProviderResults" component={ProviderResultsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="BookingConfirm" component={BookingConfirmScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AgentTrace" component={AgentTraceScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

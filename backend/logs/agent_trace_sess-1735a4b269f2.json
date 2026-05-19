@@ -1,0 +1,107 @@
+[
+  {
+    "agent": "agent_1_intent",
+    "step": "extract",
+    "timestamp": "2026-05-17T19:55:10.076623+00:00",
+    "input": {
+      "message": "Mujhe G-13 mein plumber chahiye kal subah"
+    },
+    "output": {
+      "service_type": "Plumber",
+      "location": null,
+      "time_preference": "soon",
+      "time_iso": "2026-05-18T09:00:00+00:00",
+      "language_detected": "ro",
+      "session_id": "sess-1735a4b269f2"
+    },
+    "reasoning": "Stub keyword match → Plumber",
+    "tool_used": "keyword_matcher_stub",
+    "tools_available": [
+      "gemini-2.0-flash",
+      "keyword_matcher_stub"
+    ]
+  },
+  {
+    "agent": "agent_2_discovery",
+    "step": "rank",
+    "timestamp": "2026-05-17T19:55:10.081962+00:00",
+    "input": {
+      "service_type": "Plumber",
+      "candidates": 4
+    },
+    "output": {
+      "top_id": "P005",
+      "alt_count": 3
+    },
+    "reasoning": "Weighted: 0.40 proximity + 0.40 rating + 0.20 availability",
+    "tool_used": "haversine_distance",
+    "tools_available": [
+      "haversine_distance",
+      "google_maps_distance_matrix"
+    ]
+  },
+  {
+    "agent": "agent_3_confirmation",
+    "step": "validate",
+    "timestamp": "2026-05-17T19:57:47.564976+00:00",
+    "input": {
+      "provider_id": "P005",
+      "slot": "2026-05-17T08:00:00+00:00"
+    },
+    "output": {
+      "valid": true
+    },
+    "reasoning": "Slot 2026-05-17T08:00:00+00:00 is available with Rashid Plumber Services.",
+    "tool_used": "slot_availability_check"
+  },
+  {
+    "agent": "agent_4_booking",
+    "step": "create",
+    "timestamp": "2026-05-17T19:57:47.569105+00:00",
+    "input": {
+      "provider_id": "P005",
+      "slot": "2026-05-17T08:00:00+00:00"
+    },
+    "output": {
+      "booking_id": "BK-20260517-48B1E"
+    },
+    "reasoning": "Booking persisted to bookings.json",
+    "tool_used": "json_file_writer",
+    "tools_available": [
+      "json_file_writer",
+      "firestore_writer"
+    ]
+  },
+  {
+    "agent": "agent_3_confirmation",
+    "step": "validate",
+    "timestamp": "2026-05-18T18:58:25.032652+00:00",
+    "input": {
+      "provider_id": "P005",
+      "slot": "2026-05-17T08:00:00+00:00"
+    },
+    "output": {
+      "valid": true
+    },
+    "reasoning": "Slot 2026-05-17T08:00:00+00:00 is available with Rashid Plumber Services.",
+    "tool_used": "slot_availability_check"
+  },
+  {
+    "agent": "agent_4_booking",
+    "step": "create",
+    "timestamp": "2026-05-18T18:58:25.052661+00:00",
+    "input": {
+      "provider_id": "P005",
+      "slot": "2026-05-17T08:00:00+00:00"
+    },
+    "output": {
+      "booking_id": "BK-20260518-82A29"
+    },
+    "reasoning": "Booking persisted to bookings.json",
+    "tool_used": "json_file_writer",
+    "tools_available": [
+      "json_file_writer",
+      "firestore_writer"
+    ]
+  }
+]
