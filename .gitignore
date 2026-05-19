@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Python
 __pycache__/
 *.py[cod]
@@ -29,3 +30,61 @@ backend/data/bookings.json
 node_modules/
 .expo/
 *.log
+=======
+# ── Environment & Secrets ──────────────────────────────────────────
+.env
+.env.local
+.env.production
+*.key
+*.pem
+service-account.json
+google-credentials.json
+
+# ── Python (Backend) ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# ── React Native + Expo (Mobile) ────────────────────────────────────
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*.orig.*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# ── IDE & OS ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────────────────
+logs/*.json
+!logs/sample_agent_trace.json
+*.log
+
+# ── Google Cloud ────────────────────────────────────────────────────
+.gcloud/
+>>>>>>> 4f2cf1c (Add files via upload)
