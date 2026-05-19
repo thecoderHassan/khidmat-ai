@@ -158,3 +158,8 @@ def run(input_data: dict) -> dict:
         "receipt_text": receipt_text,
         "session_id": session_id,
     }
+def create_booking(intent: dict, provider: dict, slot: str, user_name: str, user_phone: str, session_id: str) -> dict:
+    result = run({"provider": provider, "service_type": intent.get("service_type"), "confirmed_slot": slot, "session_id": session_id})
+    receipt = {"booking_id": result["booking_id"], "service": result["service_type"], "provider": {"name": result["provider_name"], "phone": result["provider_phone"], "price_range": result["price_range"]}, "scheduled_for": slot, "customer": {"name": user_name, "phone": user_phone}}
+    return {**result, "user_name": user_name, "user_phone": user_phone, "status": "confirmed", "receipt": receipt}
+    

@@ -1,0 +1,22 @@
+[
+  {
+    "session_id": "sess-5345b6e83310",
+    "timestamp": "2026-05-18T16:05:57.682221+00:00",
+    "agent": "IntentAgent",
+    "step": 1,
+    "input": {
+      "message": "G-11 fridge sahi karne wala chahi hai"
+    },
+    "reasoning": "Detected Roman Urdu. Extracted service_type=AC Technician, location=G-11, time=None.",
+    "tools_used": [
+      "gemini_api"
+    ],
+    "output": {
+      "service_type": "AC Technician",
+      "location": "G-11",
+      "time_preference": null,
+      "language_detected": "Roman Urdu"
+    },
+    "duration_ms": 2902
+  }
+]
