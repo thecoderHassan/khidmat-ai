@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Linking } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { parseISO, format } from 'date-fns';
 import { getFollowupActions, updateBookingStatus, completeBooking, getBookingDetails } from '../services/api';
 
 export default function BookingConfirmScreen({ navigation, route }) {
-  const { bookingResponse, provider, session_id } = route.params || {};
+  const { bookingResponse, booking: paramBooking, receipt: paramReceipt, bookingId: paramBookingId, provider, session_id } = route.params || {};
   
-  const [booking, setBooking] = useState(bookingResponse?.booking || {});
-  const [receipt, setReceipt] = useState(bookingResponse?.receipt || null);
+  const [booking, setBooking] = useState(paramBooking || bookingResponse?.booking || {});
+  const [receipt, setReceipt] = useState(paramReceipt || bookingResponse?.receipt || null);
   const [actions, setActions] = useState([]);
   
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,7 @@ export default function BookingConfirmScreen({ navigation, route }) {
   const [rating, setRating] = useState(5);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
-  const bookingId = booking?.booking_id || bookingResponse?.booking_id || "BK-UNKNOWN";
+  const bookingId = booking?.booking_id || paramBookingId || bookingResponse?.booking_id || "BK-UNKNOWN";
   const activeSessionId = session_id || booking?.session_id;
 
   // Fetch contextual follow-up actions and latest booking details on mount
@@ -303,7 +304,7 @@ export default function BookingConfirmScreen({ navigation, route }) {
         <View style={styles.bottomNavGroup}>
           <TouchableOpacity 
             style={styles.traceBtn} 
-            onPress={() => navigation.navigate('AgentTrace', { session_id: activeSessionId })}
+            onPress={() => navigation.navigate('AgentTrace', { session_id: activeSessionId, booking_id: bookingId })}
           >
             <Ionicons name="hardware-chip-outline" size={18} color="#ffd843" style={{ marginRight: 6 }} />
             <Text style={styles.traceBtnText}>See agent reasoning</Text>

@@ -14,9 +14,32 @@ const api = axios.create({
   timeout: 10000, // Reduced from 30s to 10s for faster local fallback response
   headers: {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
+    'ngrok-skip-browser-warning': '1',
   },
 });
+
+// Real mathematical Haversine distance calculator based on lat/lng coordinates
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2); 
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  const d = R * c; // Distance in km
+  return parseFloat(d.toFixed(2));
+};
+
+// Generates booking IDs strictly matching backend format: BK-YYYYMMDD-XXXXX
+export const generateMockBookingId = () => {
+  const today = new Date();
+  const yyyymmdd = today.toISOString().slice(0, 10).replace(/-/g, '');
+  const seq = Math.floor(10000 + Math.random() * 90000);
+  return `BK-${yyyymmdd}-${seq}`;
+};
 
 // Helper to generate mock results when backend is down
 const generateMockResults = (message, lat, lng) => {
@@ -44,8 +67,8 @@ const generateMockResults = (message, lat, lng) => {
   
   // Add scores, distance, slots, and reasoning
   const processed = candidates.map((p, index) => {
-    const dist = index === 0 ? 0.2 : (index + 1) * 1.5;
-    const proximity = 1 - (dist / 10);
+    const dist = calculateDistance(lat, lng, p.lat, p.lng) || (index === 0 ? 0.2 : (index + 1) * 1.5);
+    const proximity = Math.max(0, Math.min(1, 1 - (dist / 10)));
     const ratingVal = p.rating || 4.5;
     const ratingScore = (ratingVal - 1) / 4;
     const availabilityScore = p.available ? 1.0 : 0.0;
@@ -106,7 +129,7 @@ const generateMockBookingResponse = (bookingData) => {
     price_range: "500-2000"
   };
   
-  const bookingId = "BK-" + Math.floor(100000 + Math.random() * 900000);
+  const bookingId = generateMockBookingId();
   
   return {
     booking_id: bookingId,
@@ -186,8 +209,8 @@ export const getAgentTrace = async (sessionId) => {
           timestamp: new Date().toISOString(),
           input: { prompt: "AC technician chahiye kal subah" },
           reasoning: "The customer is requesting an 'AC Technician' in Roman Urdu. Language detected: Roman Urdu. Preferred slot: tomorrow morning. Threshold set to 10 km.",
-          tool_used: "intent_parser_agent",
-          tools_available: ["intent_parser_agent", "text_translator"],
+          tool_used: "gemini-2.5-flash",
+          tools_available: ["gemini-2.5-flash", "roman_urdu_translator"],
           output: { service_type: "AC Technician", language_detected: "ro", time_preference: "tomorrow morning" }
         },
         {
@@ -196,8 +219,8 @@ export const getAgentTrace = async (sessionId) => {
           timestamp: new Date().toISOString(),
           input: { service: "AC Technician", coordinates: { lat: 33.6938, lng: 72.9720 } },
           reasoning: "Queried the provider registry database for 'AC Technician' within 10 km of G-13. Discovered Ustad Tariq AC Services (0.2 km away, rating 4.8). Ranked highest based on proximity and experience.",
-          tool_used: "registry_geospatial_query",
-          tools_available: ["registry_geospatial_query", "slot_availability_check"],
+          tool_used: "geospatial_haversine_calculator",
+          tools_available: ["geospatial_haversine_calculator", "sqlite_provider_registry"],
           output: { candidates_found: 2, top_score: 0.95 }
         },
         {
@@ -207,7 +230,7 @@ export const getAgentTrace = async (sessionId) => {
           input: { provider_id: "P001", slots_requested: "tomorrow morning" },
           reasoning: "Validated slots for Ustad Tariq AC Services. Tomorrow 9:00 AM slot is active and locked for booking.",
           tool_used: "calendar_availability_locker",
-          tools_available: ["calendar_availability_locker"],
+          tools_available: ["calendar_availability_locker", "slot_availability_check"],
           output: { slot_locked: true, expiration: "10 mins" }
         },
         {
@@ -217,8 +240,8 @@ export const getAgentTrace = async (sessionId) => {
           input: { sessionId, user_name: "Aqib Raza", provider_id: "P001" },
           reasoning: "Committed transaction booking entry in SQL database as 'confirmed'. Dispatched WhatsApp notifications.",
           tool_used: "db_transaction_committer",
-          tools_available: ["db_transaction_committer", "whatsapp_api_notifier"],
-          output: { transaction_status: "SUCCESS", booking_id: "BK-" + Math.floor(100000 + Math.random() * 900000) }
+          tools_available: ["db_transaction_committer", "gemini-2.5-flash"],
+          output: { transaction_status: "SUCCESS", booking_id: generateMockBookingId() }
         }
       ]
     };
