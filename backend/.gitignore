@@ -1,3 +1,4 @@
+
 __pycache__/
 *.py[cod]
 *.so
@@ -16,3 +17,36 @@ logs/*.json
 data/bookings.json
 .idea/
 .vscode/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables (never commit secrets!)
+.env
+
+# Runtime data
+data/bookings.json
+logs/
+logs/*.json
+logs/agent_trace_*.json
+
+# Test/build artifacts
+.pytest_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Backup folders
+app.backup/
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
