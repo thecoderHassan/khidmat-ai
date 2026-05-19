@@ -1,0 +1,22 @@
+[
+  {
+    "session_id": "sess-08bcc1755c8c",
+    "timestamp": "2026-05-18T18:50:08.396466+00:00",
+    "agent": "IntentAgent",
+    "step": 1,
+    "input": {
+      "message": "Mujhe G-13 mein plumber chahiye kal subah"
+    },
+    "reasoning": "Detected Roman Urdu. Extracted service_type=Plumber, location=G-13, time=Tomorrow morning.",
+    "tools_used": [
+      "gemini_api"
+    ],
+    "output": {
+      "service_type": "Plumber",
+      "location": "G-13",
+      "time_preference": "Tomorrow morning",
+      "language_detected": "Roman Urdu"
+    },
+    "duration_ms": 4013
+  }
+]

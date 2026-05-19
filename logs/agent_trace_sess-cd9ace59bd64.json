@@ -1,0 +1,22 @@
+[
+  {
+    "session_id": "sess-cd9ace59bd64",
+    "timestamp": "2026-05-18T15:58:06.559638+00:00",
+    "agent": "IntentAgent",
+    "step": 1,
+    "input": {
+      "message": "AC technician chahiye kal subah"
+    },
+    "reasoning": "Detected Mixed. Extracted service_type=AC Technician, location=None, time=Tomorrow morning.",
+    "tools_used": [
+      "gemini_api"
+    ],
+    "output": {
+      "service_type": "AC Technician",
+      "location": null,
+      "time_preference": "Tomorrow morning",
+      "language_detected": "Mixed"
+    },
+    "duration_ms": 2427
+  }
+]
