@@ -271,7 +271,81 @@ def _score_provider(p: dict, user_lat: float, user_lng: float, max_km: float) ->
             f"{'available' if p.get('available') else 'busy'}."
         ),
     }
+def _normalize_score(raw_score) -> float:
+    """Normalize a score to 0-1 range.
 
+    Rehman's ranking.py returns 0-100. My stubs and Aqib's mobile both
+    expect 0-1. If the value is already in 0-1 range, leave it alone
+    (protects against double-normalization if his agent changes).
+    """
+    try:
+        s = float(raw_score)
+    except (TypeError, ValueError):
+        return 0.0
+    if s <= 1.0:
+        return max(0.0, s)
+    return min(1.0, s / 100.0)
+def _enrich_discovery_result(
+    result: dict,
+    providers: list,
+    user_lat: Optional[float],
+    user_lng: Optional[float],
+) -> dict:
+    """Convert Rehman's thin card output into our full RankedProvider shape.
+
+    His agent returns each provider as: {provider_id, name, distance_km,
+    rating, matched_slot, score, price_range, phone, area}.
+    Our model needs: id, full provider record, plus proximity_score,
+    rating_score, availability_score.
+    """
+    by_id = {p["id"]: p for p in providers}
+
+    def _enrich_one(card: Optional[dict]) -> Optional[dict]:
+        if not card:
+            return None
+        pid = card.get("provider_id") or card.get("id")
+        full = by_id.get(pid)
+        if not full:
+            # Card references a provider we don't know — return as-is, let
+            # Pydantic complain. Should never happen if catalog is in sync.
+            return card
+
+        distance = float(card.get("distance_km", 0.0))
+        # Reconstruct sub-scores from raw fields (formula: 0.40 prox + 0.40 rating + 0.20 avail)
+        # His final score is authoritative; we recompute sub-scores for display only.
+        rating = float(full.get("rating", 0))
+        rating_score = max(0.0, min(1.0, (rating - 1.0) / 4.0))
+        availability_score = 1.0 if full.get("available") else 0.0
+        # proximity normalized roughly — for accurate value we'd need the full
+        # candidate set, but distance_km is what Aqib's app displays anyway.
+        proximity_score = max(0.0, 1.0 - (distance / 20.0))  # 20km = "far"
+
+        return {
+            **full,  # all locked fields (id, lat, lng, city, available_slots, etc.)
+            "distance_km": round(distance, 2),
+             "score": round(_normalize_score(card.get("score", 0.0)), 4),
+            "proximity_score": round(proximity_score, 3),
+            "rating_score": round(rating_score, 3),
+            "availability_score": availability_score,
+            "reasoning": card.get("reasoning") or (
+                f"{full['name']} is {round(distance, 1)} km away, "
+                f"rated {rating}/5, "
+                f"{'available' if full.get('available') else 'busy'}."
+            ),
+            "matched_slot": card.get("matched_slot"),  # preserve Rehman's slot pick
+        }
+
+    return {
+        "top_match": _enrich_one(result.get("top_match")),
+        "alternatives": [
+            _enrich_one(alt) for alt in (result.get("alternatives") or [])
+            if alt is not None
+        ],
+        "session_id": result.get("session_id") or "",
+        # Keep his extra fields too in case anything reads them
+        **{k: v for k, v in result.items()
+           if k not in {"top_match", "alternatives", "session_id"}},
+    }
 
 def run_agent_2_discovery(
     intent: dict,
@@ -281,6 +355,7 @@ def run_agent_2_discovery(
     session_id: str,
 ) -> dict:
     """Agent 2 — filter by service_type, score, return top_match + alternatives."""
+    """Agent 2 — filter by service_type, score, return top_match + alternatives."""
     if _real_discovery is not None:
         try:
             result = _real_discovery(intent, providers, user_lat, user_lng)
@@ -288,6 +363,11 @@ def run_agent_2_discovery(
                 result = result.model_dump()
             elif hasattr(result, "dict"):
                 result = result.dict()
+            # Adapter: Rehman's agent returns thin "cards" with `provider_id`
+            # and ~8 display fields. Our Pydantic RankedProvider expects `id`
+            # plus the full provider record + ranking scores. Enrich by
+            # merging his scores onto the full provider from the catalog.
+            result = _enrich_discovery_result(result, providers, user_lat, user_lng)
             return result
         except Exception:
             logger.exception("Real Agent 2 failed, falling back to stub")
