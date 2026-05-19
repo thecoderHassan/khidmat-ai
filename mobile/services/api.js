@@ -2,8 +2,12 @@ import axios from 'axios';
 import { providersData } from '../screens/providersData';
 
 // Expo automatically loads EXPO_PUBLIC_* variables from .env files.
-// Using a laptop LAN IP as fallback because Expo Go on a device cannot reach localhost.
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://10.170.194.16:8000";
+// Fallback URL has been updated to the active stable Ngrok tunnel.
+// Note on Backend API Specifications (confirmed by Backend Team):
+// 1. Distance: The API returns actual distance in `provider.distance_km` (real GPS distance from user's area).
+// 2. Score scale: All scores (overall & sub-scores) are standardized on a 0-1 float scale (e.g. top_match.score = 0.85).
+// 3. Score calculation: Ranking is pre-computed on the backend using the formula: 0.40*proximity + 0.40*rating + 0.20*availability.
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "https://tastiness-silly-strife.ngrok-free.dev";
 
 const api = axios.create({
   baseURL: BASE_URL,
