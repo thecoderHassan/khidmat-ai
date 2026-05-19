@@ -469,7 +469,55 @@ def _generate_booking_id() -> str:
     now = datetime.now(timezone.utc)
     return f"BK-{now.strftime('%Y%m%d')}-{secrets.token_hex(3)[:5].upper()}"
 
+def _enrich_booking_result(
+    result: dict,
+    provider: dict,
+    slot: str,
+    user_name: str,
+    user_phone: Optional[str],
+    session_id: str,
+) -> dict:
+    """Convert Rehman's booking output to full Booking shape.
 
+    Rehman returns: booking_id, provider_name, service_type, confirmed_slot,
+    provider_phone, price_range, receipt_text, session_id.
+    Sami's Booking model needs additionally: provider_id, slot, user_name,
+    user_phone, status, created_at. Plus a structured receipt dict.
+    """
+    booking_id = result.get("booking_id") or _generate_booking_id()
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    actual_slot = result.get("confirmed_slot") or slot
+
+    booking = {
+        "booking_id": booking_id,
+        "session_id": result.get("session_id") or session_id,
+        "provider_id": provider.get("id"),
+        "provider_name": result.get("provider_name") or provider.get("name"),
+        "provider_phone": result.get("provider_phone") or provider.get("phone"),
+        "service_type": result.get("service_type"),
+        "slot": actual_slot,
+        "user_name": user_name,
+        "user_phone": user_phone,
+        "status": "confirmed",
+        "created_at": now_iso,
+    }
+    receipt = {
+        "booking_id": booking_id,
+        "service": result.get("service_type"),
+        "provider": {
+            "name": result.get("provider_name") or provider.get("name"),
+            "phone": result.get("provider_phone") or provider.get("phone"),
+            "area": provider.get("area"),
+            "rating": provider.get("rating"),
+            "price_range": result.get("price_range") or provider.get("price_range"),
+        },
+        "scheduled_for": actual_slot,
+        "issued_at": now_iso,
+        "customer": {"name": user_name, "phone": user_phone},
+        "receipt_text": result.get("receipt_text"),
+    }
+    return {**booking, "receipt": receipt}
+    
 def run_agent_4_booking(
     intent: dict,
     provider: dict,
@@ -479,6 +527,7 @@ def run_agent_4_booking(
     session_id: str,
 ) -> dict:
     """Agent 4 — persist booking, return record + receipt."""
+    """Agent 4 — persist booking, return record + receipt."""
     if _real_booking is not None:
         try:
             result = _real_booking(intent, provider, slot, user_name, user_phone, session_id)
@@ -486,6 +535,12 @@ def run_agent_4_booking(
                 result = result.model_dump()
             elif hasattr(result, "dict"):
                 result = result.dict()
+            # Adapter: Rehman's booking.py returns slim record missing
+            # provider_id, slot (renamed confirmed_slot), user_name,
+            # user_phone, status, created_at. Enrich to full Booking shape.
+            result = _enrich_booking_result(
+                result, provider, slot, user_name, user_phone, session_id
+            )
             return result
         except Exception:
             logger.exception("Real Agent 4 failed, falling back to stub")
