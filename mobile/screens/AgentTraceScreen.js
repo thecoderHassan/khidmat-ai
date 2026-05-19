@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { parseISO, format } from 'date-fns';
 import { getAgentTrace } from '../services/api';
@@ -12,7 +13,7 @@ const AGENT_NAME_MAP = {
 };
 
 export default function AgentTraceScreen({ navigation, route }) {
-  const { session_id } = route.params || {};
+  const { session_id, booking_id } = route.params || {};
   const [traceData, setTraceData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -52,8 +53,8 @@ export default function AgentTraceScreen({ navigation, route }) {
             timestamp: new Date().toISOString(),
             input: { prompt: route.params?.request || "Mujhe AC repairing ke liye technician chahiye kal subah" },
             reasoning: "The customer is requesting an 'AC Technician' (Urdu query parsed as 'AC repairing'). The language is detected as Roman Urdu ('ro') and the preferred slot is set to tomorrow morning (approx 09:00 AM). Proximity threshold set to 10 km.",
-            tool_used: "intent_parser_agent",
-            tools_available: ["intent_parser_agent", "text_translator"],
+            tool_used: "gemini-2.5-flash",
+            tools_available: ["gemini-2.5-flash", "roman_urdu_translator"],
             output: { service_type: "AC Technician", language_detected: "ro", time_preference: "tomorrow morning" }
           },
           {
@@ -62,8 +63,8 @@ export default function AgentTraceScreen({ navigation, route }) {
             timestamp: new Date().toISOString(),
             input: { service: "AC Technician", coordinates: { lat: 33.6938, lng: 72.9720 } },
             reasoning: "Queried the local provider registry database for 'AC Technician' within a 10 km radius of G-13 Islamabad coordinates. Discovered 3 potential matches: Tariq AC (G-13), Ali AC (F-10), and Master Plumber (G-11, unrelated category, skipped). Ranked Tariq highest based on proximity (0.2 km away) and star rating (4.8).",
-            tool_used: "registry_geospatial_query",
-            tools_available: ["registry_geospatial_query", "slot_availability_check"],
+            tool_used: "geospatial_haversine_calculator",
+            tools_available: ["geospatial_haversine_calculator", "sqlite_provider_registry"],
             output: { candidates_found: 2, top_score: 0.95 }
           },
           {
@@ -73,7 +74,7 @@ export default function AgentTraceScreen({ navigation, route }) {
             input: { provider_id: "P001", slots_requested: "tomorrow morning" },
             reasoning: "Validated slot times for 'Ustad Tariq AC Services'. Cross-checked scheduling calendar database. Confirmed tomorrow 9:00 AM is wide open. Reserved slot lock for current user session to prevent double booking conflicts during active check-out.",
             tool_used: "calendar_availability_locker",
-            tools_available: ["calendar_availability_locker", "sms_notifier"],
+            tools_available: ["calendar_availability_locker", "slot_availability_check"],
             output: { slot_locked: true, expiration: "10 mins" }
           },
           {
@@ -83,8 +84,8 @@ export default function AgentTraceScreen({ navigation, route }) {
             input: { session_id, user_name: "Aqib Raza", provider_id: "P001" },
             reasoning: "Committed transaction booking entry in Postgres SQL database with state 'confirmed'. Prepared automated WhatsApp reminder worker and dispatched notification events to both provider and client phones.",
             tool_used: "db_transaction_committer",
-            tools_available: ["db_transaction_committer", "whatsapp_api_notifier"],
-            output: { transaction_status: "SUCCESS", booking_id: "BK-" + Math.floor(100000 + Math.random() * 900000) }
+            tools_available: ["db_transaction_committer", "gemini-2.5-flash"],
+            output: { transaction_status: "SUCCESS", booking_id: booking_id || ("BK-" + format(new Date(), "yyyyMMdd") + "-" + Math.floor(10000 + Math.random() * 90000)) }
           }
         ]
       });

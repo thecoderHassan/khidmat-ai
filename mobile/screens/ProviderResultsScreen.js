@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Linking, ScrollView, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, ScrollView, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { parseISO, format } from 'date-fns';
 import { bookSlot } from '../services/api';
@@ -75,6 +76,9 @@ export default function ProviderResultsScreen({ navigation, route }) {
       // Navigate to Confirmation screen with the booking response and selected provider
       navigation.navigate('BookingConfirm', { 
         bookingResponse: response,
+        booking: response?.booking,
+        receipt: response?.receipt,
+        bookingId: response?.booking?.booking_id || response?.booking_id,
         provider: bookingProvider,
         session_id: session_id
       });
