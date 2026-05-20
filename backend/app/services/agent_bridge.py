@@ -310,7 +310,17 @@ def _enrich_discovery_result(
             # Pydantic complain. Should never happen if catalog is in sync.
             return card
 
-        distance = float(card.get("distance_km", 0.0))
+        # Try Google Maps for real driving distance + ETA, fall back to haversine
+        from app.services.google_maps import get_distance_km
+        if user_lat is not None and user_lng is not None:
+            distance, eta_sec, dist_tool = get_distance_km(
+                user_lat, user_lng,
+                float(full.get("lat", 0)), float(full.get("lng", 0))
+            )
+        else:
+            distance = float(card.get("distance_km", 0.0))
+            eta_sec = None
+            dist_tool = "haversine_distance"
         # Reconstruct sub-scores from raw fields (formula: 0.40 prox + 0.40 rating + 0.20 avail)
         # His final score is authoritative; we recompute sub-scores for display only.
         rating = float(full.get("rating", 0))
@@ -333,6 +343,9 @@ def _enrich_discovery_result(
                 f"{'available' if full.get('available') else 'busy'}."
             ),
             "matched_slot": card.get("matched_slot"),  # preserve Rehman's slot pick
+            "eta_seconds": eta_sec,
+            "eta_minutes": round(eta_sec / 60) if eta_sec else None,
+            "distance_tool": dist_tool,
         }
 
     return {
