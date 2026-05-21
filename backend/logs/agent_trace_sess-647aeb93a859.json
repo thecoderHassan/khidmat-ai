@@ -1,0 +1,21 @@
+[
+  {
+    "agent": "agent_2_discovery",
+    "step": "rank",
+    "timestamp": "2026-05-18T15:22:27.085277+00:00",
+    "input": {
+      "service_type": "Electrician",
+      "candidates": 4
+    },
+    "output": {
+      "top_id": "P008",
+      "alt_count": 3
+    },
+    "reasoning": "Weighted: 0.40 proximity + 0.40 rating + 0.20 availability",
+    "tool_used": "haversine_distance",
+    "tools_available": [
+      "haversine_distance",
+      "google_maps_distance_matrix"
+    ]
+  }
+]
