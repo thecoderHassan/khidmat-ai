@@ -1,3 +1,36 @@
+<<<<<<< HEAD
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Environment
+.env
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Runtime data (never commit — generated per request)
+**/logs/
+**/logs/*.json
+backend/data/bookings.json
+
+# Backup folders
+**/app.backup/
+**/backend-backup/
+
+# Node (Aqib's mobile)
+node_modules/
+.expo/
+*.log
+=======
 # ── Environment & Secrets ──────────────────────────────────────────
 .env
 .env.local
@@ -54,3 +87,4 @@ logs/*.json
 
 # ── Google Cloud ────────────────────────────────────────────────────
 .gcloud/
+>>>>>>> 4f2cf1c (Add files via upload)

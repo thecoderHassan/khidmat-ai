@@ -548,6 +548,28 @@
         "2026-05-17T17:00:00+00:00"
       ],
       "price_range": "Rs 1,000 – Rs 18,000"
+    },
+    {
+      "id": "P026",
+      "name": "Islamabad Painting Services",
+      "service_categories": [
+        "Painter"
+      ],
+      "area": "G-13",
+      "city": "Islamabad",
+      "lat": 33.6938,
+      "lng": 72.9720,
+      "phone": "+923005556677",
+      "rating": 4.5,
+      "experience_years": 10,
+      "available": true,
+      "available_slots": [
+        "2026-05-17T09:00:00+00:00",
+        "2026-05-17T12:00:00+00:00",
+        "2026-05-17T15:00:00+00:00",
+        "2026-05-17T18:00:00+00:00"
+      ],
+      "price_range": "Rs 3,000 – Rs 15,000"
     }
   ]
 }
