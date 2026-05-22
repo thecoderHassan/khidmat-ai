@@ -1,20 +1,37 @@
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ChatScreen from "./screens/ChatScreen";
 import AgentThinkingScreen from "./screens/AgentThinkingScreen";
 import ProviderResultsScreen from "./screens/ProviderResultsScreen";
 import BookingConfirmScreen from "./screens/BookingConfirmScreen";
+import AgentTraceScreen from "./screens/AgentTraceScreen";
 
 const Stack = createNativeStackNavigator();
 
+const DarkTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: '#0D1525',
+  },
+};
+
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Chat">
-        <Stack.Screen name="Chat" component={ChatScreen} options={{ title: "KhidmatAI" }} />
-        <Stack.Screen name="AgentThinking" component={AgentThinkingScreen} options={{ title: "Finding providers..." }} />
-        <Stack.Screen name="ProviderResults" component={ProviderResultsScreen} options={{ title: "Providers" }} />
-        <Stack.Screen name="BookingConfirm" component={BookingConfirmScreen} options={{ title: "Booking Confirmed" }} />
+    <NavigationContainer theme={DarkTheme}>
+      <Stack.Navigator 
+        initialRouteName="Chat"
+        screenOptions={{
+          headerStyle: { backgroundColor: '#111827' },
+          headerTintColor: '#00D4A8',
+          headerTitleStyle: { fontWeight: 'bold' }
+        }}
+      >
+        <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AgentThinking" component={AgentThinkingScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ProviderResults" component={ProviderResultsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="BookingConfirm" component={BookingConfirmScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AgentTrace" component={AgentTraceScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
