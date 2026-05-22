@@ -344,8 +344,6 @@ khidmat-ai/
 | `mobile` | Aqib | `mobile/` — all screens |
 | `main` | zeeshan | `main/` — github version controls, merging barches into main directory and deployment of app on cloud run |
 
-> **Critical rule:** Abdrehman reads `providers.json` but **never commits it**. Sami owns it.
-
 ---
 
 ## ⚙️ Environment Variables
