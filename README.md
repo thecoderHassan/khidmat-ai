@@ -342,7 +342,7 @@ khidmat-ai/
 | `agents` | Abdrehman | `backend/agents/*.py`, `backend/utils/*.py`, `antigravity/prompts/` |
 | `backend` | Sami | `backend/main.py`, routes, `backend/data/providers.json`, Docker, Cloud Run |
 | `mobile` | Aqib | `mobile/` — all screens |
-| `main` | Aqib | `main/` — merging barches into main directory and deployments on cloud run |
+| `main` | zeeshan | `main/` — github version controls, merging barches into main directory and deployment of app on cloud run |
 
 > **Critical rule:** Abdrehman reads `providers.json` but **never commits it**. Sami owns it.
 
