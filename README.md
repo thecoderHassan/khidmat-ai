@@ -39,7 +39,7 @@ Receipt:    Ali AC Services will arrive at G-13 on 18 May at 9:00 AM.
 | **AI SDK** | `google-genai` |
 | **Orchestration** | Google Antigravity — 4 agents |
 | **Data** | JSON mock (`providers.json`, `bookings.json`) |
-| **Maps / Distance** | Haversine formula (no paid Maps API) |
+| **Maps / Distance** |  Used paid Maps AI|
 | **Deployment** | Google Cloud Run |
 | **Version Control** | GitHub |
 | **Services** | 10 informal economy categories |
