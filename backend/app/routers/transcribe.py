@@ -123,4 +123,4 @@ async def transcribe_audio(audio: UploadFile = File(...)):
         raise HTTPException(
             status_code=500,
             detail=f"Transcription failed: {str(exc)[:200]}",
-        )
+

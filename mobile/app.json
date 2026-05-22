@@ -12,6 +12,12 @@
         "googleMaps": {
           "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
         }
+      },
+      "package": "com.aqib_raza.khidmatai"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "16a6d6f3-b983-45ee-82a8-71ab9d578cb4"
       }
     }
   }
