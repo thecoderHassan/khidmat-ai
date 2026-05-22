@@ -291,8 +291,8 @@ khidmat-ai/
 │   ├── agents/
 │   │   ├── intent.py               # ✅ Gemini 2.0 Flash + mock mode
 │   │   ├── discovery.py            # ✅ Haversine + ISO slot matching
-│   │   ├── confirmation.py         # 🔄 In progress (was recommendation.py)
-│   │   └── booking.py              # 🔄 In progress
+│   │   ├── confirmation.py         # ✅ 
+│   │   └── booking.py              # ✅ 
 │   ├── utils/
 │   │   ├── helpers.py              # normalize_time() — Urdu/English → ISO 8601
 │   │   ├── logger.py               # write_trace() — per-session JSON logs
