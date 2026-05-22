@@ -488,20 +488,6 @@ Each agent step is logged to `logs/agent_trace_{session_id}.json` via `utils/log
   "duration_ms": 410
 }
 ```
-
----
-
-## ⚠️ Known Issues & Decisions
-
-| Issue | Decision |
-|---|---|
-| Gemini API quota `limit: 0` | Set `MOCK_INTENT=true` in `.env` — keyword parser activates automatically |
-| Agent 3 filename | `confirmation.py` (renamed from `recommendation.py`) |
-| Time format | ISO 8601 with T separator: `"2026-05-18T09:00:00"` — required by Sami's routes |
-| Score format | Integer 0–100 (not float 0.0–1.0) |
-| `providers.json` ownership | Sami only — Abdrehman reads but never commits |
-| Maps API | Not used — haversine distance via `utils/maps.py` |
-
 ---
 
 ## 📋 Evaluation Criteria Mapping
