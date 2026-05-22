@@ -158,7 +158,7 @@ class TraceStep(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     agent: str
-    step: str
+    step:str | int
     timestamp: str
     input: Optional[dict] = None
     output: Optional[dict] = None
