@@ -340,7 +340,7 @@ khidmat-ai/
 | Branch | Person | Owns |
 |---|---|---|
 | `agents` | Abdrehman | `backend/agents/*.py`, `backend/utils/*.py`, `antigravity/prompts/` |
-| `backend` | Sami | `backend/main.py`, routes, `backend/data/providers.json`, Docker, Cloud Run |
+| `backend` | Sami | `backend/main.py`, routes, `backend/data/providers.json`, Docker |
 | `mobile` | Aqib | `mobile/` — all screens |
 | `main` | zeeshan | `main/` — github version controls, merging barches into main directory and deployment of app on cloud run |
 
