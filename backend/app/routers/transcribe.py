@@ -31,10 +31,23 @@ _MIME_MAP = {
     ".aac": "audio/aac",
 }
 
-_TRANSCRIBE_PROMPT = """You are a speech transcription assistant for a Pakistani home services app called KhidmatAI.
-The user may speak in Urdu, Roman Urdu, English, or a mix of all three.
-Please transcribe the audio exactly as spoken — do not translate, paraphrase, or summarize.
-Return ONLY the raw transcribed text with no extra explanation."""
+_TRANSCRIBE_PROMPT = """You are the transcription engine for KhidmatAI, a Pakistani home services app. Transcribe the audio exactly as spoken. Do not translate, summarize, or comment.
+
+### Examples:
+- Audio: "Plumber ko bhej dein, tap leak ho raha hai."
+  Output: Plumber ko bhej dein, tap leak ho raha hai.
+  
+- Audio: "میرا گیزر کام نہیں کر رہا، الیکٹریشن چاہیے"
+  Output: میرا گیزر کام نہیں کر رہا، الیکٹریشن چاہیے
+  
+- Audio: "Can you send someone for sofa cleaning tomorrow morning at 10 AM?"
+  Output: Can you send someone for sofa cleaning tomorrow morning at 10 AM?
+
+- Audio: "Bhai AC service کی کتنی fees ہے؟"
+  Output: Bhai AC service کی کتنی fees ہے؟
+
+### Strict Rule:
+Provide ONLY the raw transcription text matching the format of the outputs above. Absolutely no conversational filler, introductions, or explanations."""
 
 
 class TranscribeResponse(BaseModel):

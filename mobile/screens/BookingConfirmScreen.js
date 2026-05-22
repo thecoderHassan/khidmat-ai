@@ -219,27 +219,56 @@ export default function BookingConfirmScreen({ navigation, route }) {
                 <Text style={styles.receiptVal}>{booking?.provider_name || provider?.name || "Ustad"}</Text>
               </View>
               <View style={styles.receiptRow}>
-                <Text style={styles.receiptLabel}>Service Category</Text>
-                <Text style={styles.receiptVal}>{booking?.service_type || provider?.service_categories?.[0]}</Text>
-              </View>
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptLabel}>Appointment Time</Text>
-                <Text style={styles.receiptVal}>{formatSlot(booking?.slot)}</Text>
-              </View>
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptLabel}>Customer Phone</Text>
-                <Text style={[styles.receiptVal, { color: '#3b9eff' }]} onPress={() => Linking.openURL(`tel:${booking?.user_phone}`)}>
-                  {booking?.user_phone}
-                </Text>
-              </View>
-              <View style={styles.receiptRow}>
                 <Text style={styles.receiptLabel}>Rating / Experience</Text>
                 <Text style={styles.receiptVal}>⭐ {provider?.rating || "4.8"} ({provider?.experience_years || 10} yrs)</Text>
               </View>
-              <View style={[styles.receiptRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
-                <Text style={styles.receiptLabelBold}>Est. Cost Range</Text>
-                <Text style={styles.receiptValBold}>{provider?.price_range || "Rs 1,000 - 3,000"}</Text>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>Scheduled</Text>
+                <Text style={styles.receiptVal}>{formatSlot(booking?.slot)}</Text>
               </View>
+
+              {/* Dynamic Billing Information */}
+              {receipt?.billing ? (
+                <>
+                  <View style={[styles.receiptRow, { marginTop: 8, borderBottomWidth: 0, paddingBottom: 4 }]}>
+                    <Text style={[styles.receiptLabelBold, { color: '#8fa3c0' }]}>Billing</Text>
+                  </View>
+                  <View style={[styles.receiptRow, { borderBottomWidth: 0, paddingBottom: 4 }]}>
+                    <Text style={styles.receiptLabel}>Base fare</Text>
+                    <Text style={styles.receiptVal}>Rs {receipt.billing.base_fare_pkr}</Text>
+                  </View>
+                  <View style={[styles.receiptRow, { borderBottomWidth: 0, paddingBottom: 4 }]}>
+                    <Text style={styles.receiptLabel}>Visit charges</Text>
+                    <Text style={styles.receiptVal}>Rs {receipt.billing.visiting_charges_pkr}</Text>
+                  </View>
+                  <View style={[styles.receiptRow, { borderBottomWidth: 0, paddingBottom: 8 }]}>
+                    <Text style={styles.receiptLabel}>Rating premium</Text>
+                    <Text style={styles.receiptVal}>Rs {receipt.billing.rating_premium_pkr}</Text>
+                  </View>
+                  <View style={[styles.receiptRow, { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)', paddingTop: 10, paddingBottom: 8 }]}>
+                    <Text style={styles.receiptLabelBold}>Total</Text>
+                    <Text style={styles.receiptValBold}>Rs {receipt.billing.total_payable_pkr}</Text>
+                  </View>
+                  <View style={[styles.receiptRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+                    <Text style={styles.receiptLabel}>Payment</Text>
+                    <Text style={styles.receiptVal}>{receipt.billing.payment_method}</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={[styles.receiptRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+                  <Text style={styles.receiptLabelBold}>Est. Cost Range</Text>
+                  <Text style={styles.receiptValBold}>{provider?.price_range || "Rs 1,000 - 3,000"}</Text>
+                </View>
+              )}
+
+              {/* Reminder Section */}
+              {receipt?.followup_automation && (
+                <View style={[styles.receiptRow, { marginTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.04)', paddingTop: 12, borderBottomWidth: 0, paddingBottom: 0, justifyContent: 'center' }]}>
+                  <Text style={{ color: '#ffd060', fontSize: 13, fontWeight: '600' }}>
+                    🔔 Reminder {receipt.followup_automation.trigger_delta.replace(/_/g, ' ')}
+                  </Text>
+                </View>
+              )}
             </View>
           )}
         </View>
