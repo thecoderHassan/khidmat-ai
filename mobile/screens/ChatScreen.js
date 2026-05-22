@@ -11,12 +11,18 @@ import {
   Alert, 
   Modal, 
   Animated, 
-  Easing 
+  Easing,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { Audio } from 'expo-av';
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 🎤  REAL VOICE RECORDING + GEMINI TRANSCRIPTION
+//     No more simulated text — actual microphone use!
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const SUGGESTIONS = [
   "AC technician chahiye kal subah",
@@ -32,95 +38,82 @@ const PLACEHOLDERS = [
   "Haircut ke liye koi aa sakta hai?"
 ];
 
-// High-fidelity voice transcription library for judges to try different demos!
-const SPEECH_EXAMPLES = {
-  roman: "AC technician chahiye kal subah 9 baje urgent AC cooling nahi kar raha",
-  urdu: "مجھے گھر کے کچن میں پانی کے لیکیج کے لیے پلمبر کی ضرورت ہے",
-  english: "Need a certified electrician immediately for electric board spark"
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BACKEND API CONFIG
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tastiness-silly-strife.ngrok-free.dev';
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// UPLOAD AUDIO TO BACKEND → GEMINI TRANSCRIPTION
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const uploadAudioForTranscription = async (audioUri) => {
+  try {
+    const formData = new FormData();
+    const ext = audioUri.split('.').pop() || 'm4a';
+    formData.append('audio', {
+      uri: audioUri,
+      name: `recording.${ext}`,
+      type: ext === 'wav' ? 'audio/wav' : 'audio/mp4',
+    });
+
+    const response = await fetch(`${BASE_URL}/api/transcribe`, {
+      method: 'POST',
+      headers: {
+        'ngrok-skip-browser-warning': 'true',
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.detail || `Server error ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.text || '';
+  } catch (error) {
+    console.log('Audio transcription failed:', error.message);
+    throw error;
+  }
 };
 
-/* 
-  ========================================================================
-  📢 TO THE BACKEND TEAM (Abdrehman / Sami): HOW TO ACTIVATE LIVE VOICE INPUT
-  ========================================================================
-  Aqib (Mobile) has fully built the UI and the bouncing waveform animations.
-  To connect a physical microphone and send actual recorded audio files:
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ANTIGRAVITY VOICE INTENT FUNCTION
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const callAntigravityVoiceIntent = async (voiceText, location) => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/request`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+      body: JSON.stringify({
+        text: voiceText,
+        location: location || 'G-13, Islamabad',
+        source: 'voice_input',
+      }),
+    });
 
-  1. Install Expo Audio:
-     Run `npx expo install expo-av` in the mobile directory.
-     
-  2. Implement a backend route in your Python server:
-     @app.route('/api/transcribe', methods=['POST'])
-     def transcribe():
-         audio_file = request.files['file']
-         # Call OpenAI Whisper API or any Speech-to-Text library:
-         # transcription = client.audio.transcriptions.create(model="whisper-1", file=audio_file)
-         # return jsonify({"text": transcription.text})
+    if (!response.ok) throw new Error('API error');
+    const data = await response.json();
 
-  3. Uncomment this Live Recording Helper in ChatScreen.js:
-  
-  import { Audio } from 'expo-av';
-  
-  // Inside ChatScreen component:
-  const [recording, setRecording] = useState(null);
-
-  const startLiveMicrophone = async () => {
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== 'granted') return;
-      
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-      
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      setRecording(recording);
-    } catch (err) {
-      console.error('Failed to start mic recording', err);
+    if (data && data.intent_summary) {
+      return data.intent_summary;
     }
-  };
-
-  const stopLiveMicrophoneAndUpload = async () => {
-    if (!recording) return;
-    setRecording(null);
-    await recording.stopAndUnloadAsync();
-    const fileUri = recording.getURI();
-
-    // Upload audio file to backend
-    try {
-      const formData = new FormData();
-      formData.append('file', {
-        uri: fileUri,
-        name: 'user_speech.m4a',
-        type: 'audio/m4a',
-      });
-
-      const response = await fetch('http://YOUR_BACKEND_LAN_IP:8000/api/transcribe', {
-        method: 'POST',
-        body: formData,
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      const data = await response.json();
-      if (data && data.text) {
-        setRequest(data.text); // Paste live transcribed text into search box!
-      }
-    } catch (e) {
-      console.error("Transcribe API call failed:", e);
-    }
-  };
-  ========================================================================
-*/
+    return voiceText;
+  } catch (error) {
+    console.log('Antigravity voice intent failed, using raw text:', error.message);
+    return voiceText;
+  }
+};
 
 export default function ChatScreen({ navigation, route }) {
   const [request, setRequest] = useState('');
   const inputRef = useRef(null);
-  const [showKeyboardTip, setShowKeyboardTip] = useState(false);
   const [locationStr, setLocationStr] = useState('');
 
-  const [coordinates, setCoordinates] = useState({ lat: 33.6938, lng: 72.9720 }); // Default fallback: G-13 Islamabad
+  const [coordinates, setCoordinates] = useState({ lat: 33.6938, lng: 72.9720 });
   const [loadingLocation, setLoadingLocation] = useState(false);
   
   const [placeholderText, setPlaceholderText] = useState('');
@@ -128,29 +121,32 @@ export default function ChatScreen({ navigation, route }) {
   const [charIndex, setCharIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Speech Recognition States
+  // Voice states
   const [voiceModalVisible, setVoiceModalVisible] = useState(false);
-  const [selectedLang, setSelectedLang] = useState('roman'); // 'roman' | 'urdu' | 'english'
+  const [selectedLang, setSelectedLang] = useState('roman');
   const [voiceText, setVoiceText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isDoneTranscribing, setIsDoneTranscribing] = useState(false);
-  const [recordingInstance, setRecordingInstance] = useState(null);
+  const [isProcessingIntent, setIsProcessingIntent] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
-  // Waveform Bar Animation Heights (using Animated Values)
+  // Real audio recording ref
+  const recordingRef = useRef(null);
+
+  // Waveform animations
   const [wave1] = useState(new Animated.Value(15));
   const [wave2] = useState(new Animated.Value(25));
   const [wave3] = useState(new Animated.Value(18));
   const [wave4] = useState(new Animated.Value(35));
   const [wave5] = useState(new Animated.Value(20));
 
-  // Handle prefilled text when navigating back for rebooking
   useEffect(() => {
     if (route.params?.prefilledText) {
       setRequest(route.params.prefilledText);
     }
   }, [route.params?.prefilledText]);
 
-  // Animated Typing Placeholder Effect
+  // Typing placeholder animation
   useEffect(() => {
     const typingSpeed = isDeleting ? 30 : 60;
     const currentWord = PLACEHOLDERS[placeholderIndex];
@@ -159,15 +155,12 @@ export default function ChatScreen({ navigation, route }) {
       if (!isDeleting && charIndex < currentWord.length) {
         setPlaceholderText(currentWord.substring(0, charIndex + 1));
         setCharIndex(prev => prev + 1);
-      } 
-      else if (isDeleting && charIndex > 0) {
+      } else if (isDeleting && charIndex > 0) {
         setPlaceholderText(currentWord.substring(0, charIndex - 1));
         setCharIndex(prev => prev - 1);
-      } 
-      else if (!isDeleting && charIndex === currentWord.length) {
+      } else if (!isDeleting && charIndex === currentWord.length) {
         setTimeout(() => setIsDeleting(true), 2000); 
-      } 
-      else if (isDeleting && charIndex === 0) {
+      } else if (isDeleting && charIndex === 0) {
         setIsDeleting(false);
         setPlaceholderIndex((prev) => (prev + 1) % PLACEHOLDERS.length);
       }
@@ -176,27 +169,15 @@ export default function ChatScreen({ navigation, route }) {
     return () => clearTimeout(timeout);
   }, [charIndex, isDeleting, placeholderIndex]);
 
-  // Waveform bouncing animation sequence
   const startWaveformAnimation = () => {
     const createBouncingLoop = (animVal, maxVal, speed) => {
       return Animated.loop(
         Animated.sequence([
-          Animated.timing(animVal, {
-            toValue: maxVal,
-            duration: speed,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: false
-          }),
-          Animated.timing(animVal, {
-            toValue: 12,
-            duration: speed,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: false
-          })
+          Animated.timing(animVal, { toValue: maxVal, duration: speed, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+          Animated.timing(animVal, { toValue: 12, duration: speed, easing: Easing.inOut(Easing.ease), useNativeDriver: false })
         ])
       );
     };
-
     Animated.parallel([
       createBouncingLoop(wave1, 55, 300),
       createBouncingLoop(wave2, 85, 450),
@@ -206,15 +187,9 @@ export default function ChatScreen({ navigation, route }) {
     ]).start();
   };
 
-  // Stop Waveform animations and reset
   const stopWaveformAnimation = () => {
-    wave1.stopAnimation();
-    wave2.stopAnimation();
-    wave3.stopAnimation();
-    wave4.stopAnimation();
-    wave5.stopAnimation();
-    
-    // Reset to idle values
+    wave1.stopAnimation(); wave2.stopAnimation();
+    wave3.stopAnimation(); wave4.stopAnimation(); wave5.stopAnimation();
     Animated.parallel([
       Animated.timing(wave1, { toValue: 15, duration: 200, useNativeDriver: false }),
       Animated.timing(wave2, { toValue: 20, duration: 200, useNativeDriver: false }),
@@ -224,160 +199,159 @@ export default function ChatScreen({ navigation, route }) {
     ]).start();
   };
 
-  // Cancel/Close Voice Input cleanly stopping active recording
-  const handleCancelVoice = () => {
+  const handleCancelVoice = async () => {
+    // Stop any active recording
+    if (recordingRef.current) {
+      try {
+        await recordingRef.current.stopAndUnloadAsync();
+      } catch (e) { /* ignore */ }
+      recordingRef.current = null;
+    }
     stopWaveformAnimation();
     setVoiceModalVisible(false);
     setIsListening(false);
     setIsDoneTranscribing(false);
-    
-    /* 
-      // ========================================================
-      // 🎙️ BACKEND TEAM: PHYSICAL MICROPHONE RECORDING CLEANUP
-      // ========================================================
-      if (recordingInstance) {
-        try {
-          recordingInstance.stopAndUnloadAsync();
-        } catch (e) {}
-        setRecordingInstance(null);
-      }
-    */
+    setIsProcessingIntent(false);
+    setStatusMessage('');
   };
 
-  // Dynamic Stop Speech handling: uploads real recording if active, or falls back to simulation
-  const handleStopSpeech = async (activeRecording, simulatedText) => {
-    stopWaveformAnimation();
-    setIsListening(false);
-    setIsDoneTranscribing(true);
-
-    /*
-      // ========================================================
-      // 🎙️ BACKEND TEAM: PHYSICAL AUDIO FILE UPLOAD & Whisper API
-      // ========================================================
-      const rec = activeRecording || recordingInstance;
-      if (rec) {
-        try {
-          await rec.stopAndUnloadAsync();
-          const fileUri = rec.getURI();
-          setRecordingInstance(null);
-
-          const formData = new FormData();
-          formData.append('file', {
-            uri: fileUri,
-            name: 'user_speech.m4a',
-            type: 'audio/m4a',
-          });
-
-          const response = await fetch('http://10.170.194.16:8000/api/transcribe', {
-            method: 'POST',
-            body: formData,
-            headers: { 'Content-Type': 'multipart/form-data' },
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data && data.text) {
-              setVoiceText(data.text);
-              setTimeout(() => {
-                setRequest(data.text);
-                setVoiceModalVisible(false);
-                setIsDoneTranscribing(false);
-              }, 1500);
-              return;
-            }
-          }
-        } catch (e) {
-          console.warn("⚠️ Live backend STT offline. Defaulting to local simulator...");
-        }
-      }
-    */
-
-    // Set simulated text, letting user review and manually submit!
-    setVoiceText(simulatedText);
-  };
-
-
-  // Speech Recognition simulated & real hybrid processing
-  const handleStartSpeech = () => {
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🎤 REAL MICROPHONE: Start Recording
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const handleStartSpeech = async () => {
     if (isListening) return;
 
-    setIsListening(true);
-    setIsDoneTranscribing(false);
-    setVoiceText('');
-    startWaveformAnimation();
-
-    /*
-      // ========================================================
-      // 🎙️ BACKEND TEAM: PHYSICAL MICROPHONE RECORDING INITIATOR
-      // ========================================================
-      let activeRecording = null;
-      try {
-        const permission = await Audio.requestPermissionsAsync();
-        if (permission.status === 'granted') {
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-          });
-
-          const { recording } = await Audio.Recording.createAsync(
-            Audio.RecordingOptionsPresets.HIGH_QUALITY
-          );
-          activeRecording = recording;
-          setRecordingInstance(recording);
-        }
-      } catch (err) {
-        console.warn("⚠️ Cannot initiate physical microphone on this device:", err);
+    try {
+      // Request microphone permission
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          'Microphone Permission',
+          'KhidmatAI ko aapki awaaz sunne ke liye mic permission chahiye. Settings mein ja kar allow karein.',
+          [{ text: 'OK' }]
+        );
+        return;
       }
-    */
 
-    const textToType = SPEECH_EXAMPLES[selectedLang];
-    const words = textToType.split(' ');
-    let currentSentence = "";
-    let wordIdx = 0;
+      // Configure audio mode for recording
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
 
-    // Concurrently run the typewriter transcription overlay
-    const interval = setInterval(() => {
-      if (wordIdx < words.length) {
-        currentSentence += (wordIdx === 0 ? "" : " ") + words[wordIdx];
-        setVoiceText(currentSentence);
-        wordIdx++;
-      } else {
-        clearInterval(interval);
-        handleStopSpeech(null, textToType);
-      }
-    }, 450); // Speaks a word every 450ms for natural timing
+      // Start recording with high quality preset
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      recordingRef.current = recording;
+      setIsListening(true);
+      setIsDoneTranscribing(false);
+      setVoiceText('');
+      setStatusMessage('🎙️ Bol rahe hain... jab done ho tap karein');
+      startWaveformAnimation();
+
+    } catch (error) {
+      console.log('Failed to start recording:', error);
+      Alert.alert('Recording Error', 'Mic start nahi ho saka. Dubara try karein.');
+    }
   };
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🛑 STOP RECORDING → UPLOAD → TRANSCRIBE → INTENT
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const handleStopSpeech = async () => {
+    if (!recordingRef.current) return;
 
+    stopWaveformAnimation();
+    setIsListening(false);
+    setIsProcessingIntent(true);
+    setStatusMessage('⏳ Audio upload ho rahi hai...');
 
-  // Request GPS Location Coordinates
+    try {
+      // Stop and get the recording URI
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+
+      // Reset audio mode
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+      });
+
+      if (!uri) {
+        throw new Error('No audio file URI received');
+      }
+
+      // Step 1: Upload audio to backend for Gemini transcription
+      setStatusMessage('🤖 Gemini sun raha hai...');
+      const transcribedText = await uploadAudioForTranscription(uri);
+
+      if (!transcribedText) {
+        throw new Error('Empty transcription returned');
+      }
+
+      setVoiceText(transcribedText);
+      setIsDoneTranscribing(true);
+      setStatusMessage('✅ Transcription done! Intent extract ho raha hai...');
+
+      // Step 2: Pass transcribed text to Antigravity for intent extraction
+      const intentText = await callAntigravityVoiceIntent(transcribedText, locationStr);
+
+      // Fill the request input and close modal
+      setRequest(intentText);
+      setIsProcessingIntent(false);
+      setVoiceModalVisible(false);
+      setIsDoneTranscribing(false);
+      setStatusMessage('');
+
+    } catch (error) {
+      console.log('Voice pipeline error:', error.message);
+      setIsProcessingIntent(false);
+      setStatusMessage('');
+      Alert.alert(
+        'Voice Processing Error',
+        `Awaaz process nahi ho saki: ${error.message}\n\nAap manually bhi type kar sakte hain.`,
+        [
+          { text: 'Retry', onPress: () => {} },
+          { text: 'Type Manually', onPress: handleCancelVoice },
+        ]
+      );
+    }
+  };
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // MANUAL TEXT → INTENT (when user types in voice modal)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const handleSendManualText = async (text) => {
+    setIsProcessingIntent(true);
+    setStatusMessage('🤖 Antigravity agent samajh raha hai...');
+
+    const intentText = await callAntigravityVoiceIntent(text, locationStr);
+
+    setRequest(intentText);
+    setIsProcessingIntent(false);
+    setVoiceModalVisible(false);
+    setIsDoneTranscribing(false);
+    setStatusMessage('');
+  };
+
   const fetchLocation = async (silent = false) => {
     if (!silent) setLoadingLocation(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        if (!silent) {
-          Alert.alert(
-            "Location Permission Denied",
-            "We will use the default G-13 Islamabad coordinates for matching.",
-            [{ text: "OK" }]
-          );
-        }
+        if (!silent) Alert.alert("Location Permission Denied", "We will use the default G-13 Islamabad coordinates for matching.", [{ text: "OK" }]);
         setCoordinates({ lat: 33.6938, lng: 72.9720 });
         setLocationStr("G-13, Islamabad (Default Fallback)");
         return { lat: 33.6938, lng: 72.9720 };
       }
-
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const currentCoords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
       setCoordinates(currentCoords);
       setLocationStr(`GPS Active: ${currentCoords.lat.toFixed(4)}, ${currentCoords.lng.toFixed(4)}`);
       return currentCoords;
     } catch (error) {
-      console.error("Location fetching failed:", error);
-      if (!silent) {
-        Alert.alert("GPS Error", "Failed to get active location. Using G-13 fallback.");
-      }
       setCoordinates({ lat: 33.6938, lng: 72.9720 });
       setLocationStr("G-13, Islamabad (Default Fallback)");
       return { lat: 33.6938, lng: 72.9720 };
@@ -391,16 +365,13 @@ export default function ChatScreen({ navigation, route }) {
       Alert.alert("KhidmatAI", "Please enter what you need help with first.");
       return;
     }
-
     let lat = coordinates.lat;
     let lng = coordinates.lng;
-
     if (!locationStr) {
       const coords = await fetchLocation(true);
       lat = coords.lat;
       lng = coords.lng;
     }
-
     navigation.navigate('AgentThinking', { 
       request: request.trim(),
       user_lat: lat,
@@ -412,7 +383,7 @@ export default function ChatScreen({ navigation, route }) {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Header Hero Section */}
+        {/* Header */}
         <View style={styles.heroSection}>
           <View style={styles.logoBadge}>
             <Text style={styles.urduLogo}>خدمت</Text>
@@ -421,7 +392,7 @@ export default function ChatScreen({ navigation, route }) {
           <Text style={styles.tagline}>Ghar Baithe, Kaam Karwao</Text>
         </View>
 
-        {/* Input Wrapper Card with microphone integration */}
+        {/* Input Card */}
         <View style={styles.inputWrapper}>
           <View style={styles.promptHeader}>
             <Ionicons name="sparkles" size={16} color="#00D4A8" />
@@ -439,37 +410,26 @@ export default function ChatScreen({ navigation, route }) {
               onChangeText={setRequest}
             />
 
-            {/* Glowing Turquoise Voice Mic Trigger */}
+            {/* Mic button → opens voice modal */}
             <TouchableOpacity 
               style={styles.micBtn} 
               onPress={() => {
-                inputRef.current?.focus();
-                setShowKeyboardTip(true);
-                // Automatically hide after 25 seconds (gives ample time for demonstration)
-                setTimeout(() => {
-                  setShowKeyboardTip(false);
-                }, 25000);
+                setVoiceText('');
+                setIsDoneTranscribing(false);
+                setIsListening(false);
+                setIsProcessingIntent(false);
+                setStatusMessage('');
+                setVoiceModalVisible(true);
               }}
             >
               <Ionicons name="mic-outline" size={24} color="#050810" />
             </TouchableOpacity>
           </View>
 
-          {/* Compact Inline Guide Toast - Always visible above keyboard! */}
-          {showKeyboardTip && (
-            <View style={styles.toastGuideBoxInline}>
-              <Ionicons name="mic-circle" size={18} color="#00D4A8" style={{ marginRight: 6 }} />
-              <Text style={styles.toastGuideTextInline}>
-                Keyboard ke top-right bar par diye gaye <Text style={{ color: '#00D4A8', fontWeight: '800' }}>Mic (🎙️)</Text> icon par tap karein aur bolien!
-              </Text>
-            </View>
-          )}
-
           <Text style={styles.langLabel}>Understands Urdu, Roman Urdu, and English voice commands</Text>
         </View>
 
-
-        {/* GPS location selector */}
+        {/* GPS */}
         <TouchableOpacity 
           style={[styles.locationBtn, locationStr ? styles.locationActive : null]} 
           onPress={() => fetchLocation(false)}
@@ -485,13 +445,13 @@ export default function ChatScreen({ navigation, route }) {
           </Text>
         </TouchableOpacity>
 
-        {/* Primary Action Button */}
+        {/* Search */}
         <TouchableOpacity style={styles.submitBtn} onPress={handleSearch}>
           <Ionicons name="search" size={20} color="#050810" style={{ marginRight: 8 }} />
           <Text style={styles.submitBtnText}>Find a provider</Text>
         </TouchableOpacity>
 
-        {/* Suggestion Chips */}
+        {/* Suggestions */}
         <Text style={styles.suggestedTitle}>Tap to Try Example prompts</Text>
         <View style={styles.quickGrid}>
           {SUGGESTIONS.map((suggestion, idx) => (
@@ -509,9 +469,9 @@ export default function ChatScreen({ navigation, route }) {
         </View>
       </ScrollView>
 
-      {/* ========================================== */}
-      {/* GLOWING BOTTOM SHEET VOICE RECOGNITION HUD */}
-      {/* ========================================== */}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          VOICE MODAL — REAL MICROPHONE
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -521,114 +481,63 @@ export default function ChatScreen({ navigation, route }) {
         <View style={styles.modalBackdrop}>
           <View style={styles.voiceSheet}>
             
-            {/* Sheet Handle Accent */}
             <View style={styles.sheetHandle} />
 
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>KhidmatAI Voice Assistant</Text>
-              <TouchableOpacity 
-                style={styles.sheetCloseBtn} 
-                onPress={handleCancelVoice}
-              >
+              <Text style={styles.sheetTitle}>🎤 KhidmatAI Voice</Text>
+              <TouchableOpacity style={styles.sheetCloseBtn} onPress={handleCancelVoice}>
                 <Ionicons name="close" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.voiceInstruct}>
-              Select your spoken language and tap the microphone to start speaking:
+              Mic dabayein, Urdu/English/Roman Urdu mein bolein, hum samajh jayenge:
             </Text>
 
-            {/* Language Selection Filter Toggle */}
-            <View style={styles.langSelectorRow}>
-              <TouchableOpacity 
-                style={[styles.langSelectBtn, selectedLang === 'roman' ? styles.langSelectActive : null]}
-                onPress={() => {
-                  if (isListening) return;
-                  setSelectedLang('roman');
-                  setVoiceText('');
-                }}
-              >
-                <Text style={[styles.langSelectText, selectedLang === 'roman' ? styles.langSelectTextActive : null]}>
-                  Roman Urdu
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.langSelectBtn, selectedLang === 'urdu' ? styles.langSelectActive : null]}
-                onPress={() => {
-                  if (isListening) return;
-                  setSelectedLang('urdu');
-                  setVoiceText('');
-                }}
-              >
-                <Text style={[styles.langSelectText, selectedLang === 'urdu' ? styles.langSelectTextActive : null]}>
-                  اردو (Urdu)
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.langSelectBtn, selectedLang === 'english' ? styles.langSelectActive : null]}
-                onPress={() => {
-                  if (isListening) return;
-                  setSelectedLang('english');
-                  setVoiceText('');
-                }}
-              >
-                <Text style={[styles.langSelectText, selectedLang === 'english' ? styles.langSelectTextActive : null]}>
-                  English
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Direct Keyboard Dictation Fast Bypass */}
-            {!isListening && (
-              <TouchableOpacity 
-                style={styles.keyboardMicLink}
-                onPress={() => {
-                  setVoiceModalVisible(false);
-                  setTimeout(() => {
-                    inputRef.current?.focus();
-                    setShowKeyboardTip(true);
-                    // Automatically hide after 7 seconds
-                    setTimeout(() => {
-                      setShowKeyboardTip(false);
-                    }, 7000);
-                  }, 400);
-                }}
-              >
-                <Ionicons name="keypad-outline" size={15} color="#00D4A8" style={{ marginRight: 6 }} />
-                <Text style={styles.keyboardMicLinkText}>Use Keyboard Voice Dictation (100% Real) 🎙️</Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Visualizer Waveform Arena */}
-
+            {/* Waveform */}
             <View style={styles.visualizerContainer}>
-              <View style={styles.waveRow}>
-                <Animated.View style={[styles.waveBar, { height: wave1 }]} />
-                <Animated.View style={[styles.waveBar, { height: wave2 }]} />
-                <Animated.View style={[styles.waveBar, { height: wave3 }]} />
-                <Animated.View style={[styles.waveBar, { height: wave4 }]} />
-                <Animated.View style={[styles.waveBar, { height: wave5 }]} />
-              </View>
+              {isProcessingIntent ? (
+                <View style={{ alignItems: 'center', gap: 12 }}>
+                  <ActivityIndicator size="large" color="#00D4A8" />
+                  <Text style={{ color: '#00D4A8', fontSize: 14, fontWeight: '700', textAlign: 'center' }}>
+                    {statusMessage || '🤖 Processing...'}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.waveRow}>
+                  <Animated.View style={[styles.waveBar, { height: wave1 }]} />
+                  <Animated.View style={[styles.waveBar, { height: wave2 }]} />
+                  <Animated.View style={[styles.waveBar, { height: wave3 }]} />
+                  <Animated.View style={[styles.waveBar, { height: wave4 }]} />
+                  <Animated.View style={[styles.waveBar, { height: wave5 }]} />
+                </View>
+              )}
             </View>
 
-            {/* Simulated Live Transcription Box (Editable!) */}
+            {/* Transcription box */}
             <View style={styles.transcriptionBox}>
               {isListening ? (
-                <Text style={[styles.transcriptionText, selectedLang === 'urdu' ? styles.urduRightText : null]}>
+                <View style={{ alignItems: 'center', gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={styles.redPulseDot} />
+                    <Text style={{ color: '#ff4a4a', fontSize: 15, fontWeight: '700' }}>
+                      Recording... bol rahe hain
+                    </Text>
+                  </View>
+                  <Text style={{ color: '#5a6a85', fontSize: 12 }}>
+                    Done hone par neechay Stop button dabayein
+                  </Text>
+                </View>
+              ) : voiceText ? (
+                <Text style={styles.transcriptionText}>
                   "{voiceText}"
-                  <Text style={styles.cursorDot}> |</Text>
                 </Text>
               ) : (
                 <TextInput
-                  style={[styles.transcriptionInputText, selectedLang === 'urdu' ? styles.urduRightText : null]}
+                  style={styles.transcriptionInputText}
                   value={voiceText}
-                  onChangeText={(txt) => {
-                    setVoiceText(txt);
-                    setIsDoneTranscribing(txt.length > 0);
-                  }}
-                  placeholder="Apni marzi ka text likhein ya mic daba kar bolien..."
+                  onChangeText={(txt) => { setVoiceText(txt); setIsDoneTranscribing(txt.length > 0); }}
+                  placeholder="Ya yahan manually type karein..."
                   placeholderTextColor="#5a6a85"
                   multiline={true}
                   keyboardAppearance="dark"
@@ -636,15 +545,12 @@ export default function ChatScreen({ navigation, route }) {
               )}
             </View>
 
-            {/* Action Buttons for Transcription */}
-            {!isListening && voiceText.length > 0 && (
+            {/* Action buttons — only show when text is available and not recording/processing */}
+            {!isListening && !isProcessingIntent && voiceText.length > 0 && (
               <View style={styles.voiceActionRow}>
                 <TouchableOpacity 
                   style={styles.voiceSecondaryBtn} 
-                  onPress={() => {
-                    setVoiceText('');
-                    setIsDoneTranscribing(false);
-                  }}
+                  onPress={() => { setVoiceText(''); setIsDoneTranscribing(false); }}
                 >
                   <Ionicons name="refresh" size={16} color="#8fa3c0" style={{ marginRight: 6 }} />
                   <Text style={styles.voiceSecondaryBtnText}>Clear / Retry</Text>
@@ -652,11 +558,7 @@ export default function ChatScreen({ navigation, route }) {
 
                 <TouchableOpacity 
                   style={styles.voicePrimaryBtn} 
-                  onPress={() => {
-                    setRequest(voiceText);
-                    setVoiceModalVisible(false);
-                    setIsDoneTranscribing(false);
-                  }}
+                  onPress={() => handleSendManualText(voiceText)}
                 >
                   <Ionicons name="send" size={16} color="#050810" style={{ marginRight: 6 }} />
                   <Text style={styles.voicePrimaryBtnText}>Ask KhidmatAI</Text>
@@ -664,34 +566,46 @@ export default function ChatScreen({ navigation, route }) {
               </View>
             )}
 
-
-            {/* Pulse Mic Activation Action */}
+            {/* Mic Control Center */}
             <View style={styles.micControlCenter}>
               {isListening ? (
-                <View style={styles.listeningStateRow}>
-                  <View style={styles.redPulseDot} />
-                  <Text style={styles.listeningStatusText}>Listening to your voice...</Text>
-                </View>
+                <Text style={{ color: '#ff4a4a', fontSize: 13, fontWeight: '700', marginBottom: 12 }}>
+                  ⏺ Recording jari hai...
+                </Text>
+              ) : isProcessingIntent ? (
+                <Text style={{ color: '#00D4A8', fontSize: 13, fontWeight: '700', marginBottom: 12 }}>
+                  {statusMessage || 'Processing...'}
+                </Text>
               ) : isDoneTranscribing ? (
                 <View style={styles.listeningStateRow}>
                   <Ionicons name="checkmark-circle" size={18} color="#00D4A8" style={{ marginRight: 6 }} />
-                  <Text style={[styles.listeningStatusText, { color: '#00D4A8' }]}>Transcription Success!</Text>
+                  <Text style={[styles.listeningStatusText, { color: '#00D4A8' }]}>Transcription complete!</Text>
                 </View>
               ) : (
-                <Text style={styles.tapToTalkText}>Tap below to start speaking</Text>
+                <Text style={styles.tapToTalkText}>Tap to start recording</Text>
               )}
 
               <TouchableOpacity 
-                style={[styles.bigMicBtn, isListening ? styles.bigMicActive : null]}
-                onPress={handleStartSpeech}
-                disabled={isListening}
+                style={[
+                  styles.bigMicBtn, 
+                  isListening ? styles.bigMicActive : null,
+                  isProcessingIntent ? styles.bigMicDisabled : null,
+                ]}
+                onPress={isListening ? handleStopSpeech : handleStartSpeech}
+                disabled={isProcessingIntent}
               >
                 <Ionicons 
-                  name={isListening ? "pulse" : "mic-sharp"} 
+                  name={isListening ? "stop" : "mic-sharp"} 
                   size={38} 
-                  color={isListening ? "#fff" : "#050810"} 
+                  color={isListening ? "#fff" : (isProcessingIntent ? "#5a6a85" : "#050810")} 
                 />
               </TouchableOpacity>
+
+              {isListening && (
+                <Text style={{ color: '#5a6a85', fontSize: 11, marginTop: 10 }}>
+                  Stop karne ke liye button dabayein
+                </Text>
+              )}
             </View>
           </View>
         </View>
@@ -704,368 +618,54 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#050810' },
   scrollContent: { padding: 24, paddingBottom: 40 },
   heroSection: { alignItems: 'center', marginBottom: 35, marginTop: 30 },
-  logoBadge: {
-    backgroundColor: 'rgba(0, 212, 168, 0.1)',
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 24,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 212, 168, 0.3)',
-  },
+  logoBadge: { backgroundColor: 'rgba(0, 212, 168, 0.1)', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 24, marginBottom: 10, borderWidth: 1.5, borderColor: 'rgba(0, 212, 168, 0.3)' },
   urduLogo: { fontSize: 38, fontWeight: '800', color: '#00D4A8' },
   appName: { fontSize: 34, fontWeight: '900', color: '#FFF', letterSpacing: -0.5 },
   aiText: { color: '#00D4A8' },
   tagline: { fontSize: 16, color: '#8fa3c0', marginTop: 8, fontWeight: '500' },
-  
-  inputWrapper: {
-    backgroundColor: '#0b0f1a',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    marginBottom: 18,
-    shadowColor: '#00D4A8',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 20,
-    elevation: 5,
-  },
+  inputWrapper: { backgroundColor: '#0b0f1a', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', marginBottom: 18, shadowColor: '#00D4A8', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 20, elevation: 5 },
   promptHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   promptLabel: { color: '#00D4A8', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginLeft: 6 },
-  
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    minHeight: 110,
-  },
-  input: {
-    color: '#FFF',
-    fontSize: 18,
-    textAlignVertical: 'top',
-    lineHeight: 26,
-    flex: 1,
-    paddingRight: 10,
-    minHeight: 110,
-  },
-  micBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#00D4A8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 5,
-    shadowColor: '#00D4A8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', minHeight: 110 },
+  input: { color: '#FFF', fontSize: 18, textAlignVertical: 'top', lineHeight: 26, flex: 1, paddingRight: 10, minHeight: 110 },
+  micBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#00D4A8', justifyContent: 'center', alignItems: 'center', marginBottom: 5, shadowColor: '#00D4A8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   langLabel: { color: '#5a6a85', fontSize: 11, marginTop: 12, fontStyle: 'italic' },
-  
-  locationBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#111827',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 158, 255, 0.2)',
-  },
-  locationActive: {
-    borderColor: 'rgba(0, 212, 168, 0.3)',
-    backgroundColor: 'rgba(0, 212, 168, 0.03)',
-  },
+  locationBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', padding: 16, borderRadius: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(59, 158, 255, 0.2)' },
+  locationActive: { borderColor: 'rgba(0, 212, 168, 0.3)', backgroundColor: 'rgba(0, 212, 168, 0.03)' },
   locationIcon: { marginRight: 10 },
   locationBtnText: { color: '#3b9eff', fontSize: 14, fontWeight: '600' },
   locationActiveText: { color: '#00D4A8' },
-  
-  submitBtn: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    backgroundColor: '#00D4A8',
-    padding: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginBottom: 35,
-    shadowColor: '#00D4A8',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 8,
-  },
+  submitBtn: { flexDirection: 'row', justifyContent: 'center', backgroundColor: '#00D4A8', padding: 18, borderRadius: 16, alignItems: 'center', marginBottom: 35, shadowColor: '#00D4A8', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 15, elevation: 8 },
   submitBtnText: { color: '#050810', fontSize: 17, fontWeight: '800' },
-  
   suggestedTitle: { color: '#8fa3c0', fontSize: 14, fontWeight: '600', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 0.5 },
   quickGrid: { flexDirection: 'column', gap: 10 },
-  quickBtn: {
-    backgroundColor: '#111827',
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
+  quickBtn: { backgroundColor: '#111827', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   chipRow: { flexDirection: 'row', alignItems: 'center' },
   quickBtnText: { color: '#e4eaf8', fontSize: 14, fontWeight: '500', flex: 1 },
-
-  // VOICE BOTTOM SHEET STYLING
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(5, 8, 16, 0.85)',
-    justifyContent: 'flex-end',
-  },
-  voiceSheet: {
-    backgroundColor: '#0b0f1a',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 24,
-    paddingBottom: 40,
-    borderTopWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  sheetHandle: {
-    width: 40,
-    height: 5,
-    backgroundColor: '#5a6a85',
-    borderRadius: 3,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: -0.5,
-  },
-  sheetCloseBtn: {
-    padding: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  voiceInstruct: {
-    color: '#8fa3c0',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  langSelectorRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 24,
-  },
-  langSelectBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    backgroundColor: '#111827',
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  langSelectActive: {
-    backgroundColor: 'rgba(0, 212, 168, 0.1)',
-    borderColor: '#00D4A8',
-  },
-  langSelectText: {
-    color: '#8fa3c0',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  langSelectTextActive: {
-    color: '#00D4A8',
-  },
-  visualizerContainer: {
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#050810',
-    borderRadius: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
-  },
-  waveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    height: 100,
-  },
-  waveBar: {
-    width: 6,
-    backgroundColor: '#00D4A8',
-    borderRadius: 3,
-  },
-  transcriptionBox: {
-    minHeight: 80,
-    backgroundColor: '#111827',
-    borderRadius: 16,
-    padding: 16,
-    justifyContent: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  transcriptionText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 24,
-    textAlign: 'center',
-  },
-  urduRightText: {
-    textAlign: 'right',
-    fontSize: 18,
-    lineHeight: 28,
-  },
-  transcriptionPlaceholder: {
-    color: '#5a6a85',
-    fontSize: 14,
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  cursorDot: {
-    color: '#00D4A8',
-    fontWeight: '900',
-  },
-  micControlCenter: {
-    alignItems: 'center',
-  },
-  listeningStateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  redPulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ff4a4a',
-    marginRight: 8,
-  },
-  listeningStatusText: {
-    color: '#8fa3c0',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  tapToTalkText: {
-    color: '#5a6a85',
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  bigMicBtn: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: '#00D4A8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#00D4A8',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 8,
-  },
-  bigMicActive: {
-    backgroundColor: '#ff4a4a',
-    shadowColor: '#ff4a4a',
-  },
-  transcriptionInputText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 24,
-    textAlign: 'center',
-    width: '100%',
-    padding: 0,
-  },
-  voiceActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 24,
-  },
-  voicePrimaryBtn: {
-    flex: 1.2,
-    backgroundColor: '#00D4A8',
-    paddingVertical: 14,
-    borderRadius: 14,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#00D4A8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  voicePrimaryBtnText: {
-    color: '#050810',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  voiceSecondaryBtn: {
-    flex: 1,
-    backgroundColor: '#111827',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingVertical: 14,
-    borderRadius: 14,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  voiceSecondaryBtnText: {
-    color: '#8fa3c0',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  keyboardMicLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 212, 168, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 168, 0.2)',
-    paddingVertical: 11,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  keyboardMicLinkText: {
-    color: '#00D4A8',
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  toastGuideBoxInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 212, 168, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 168, 0.25)',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  toastGuideTextInline: {
-    color: '#e4eaf8',
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 18,
-    flex: 1,
-  }
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(5, 8, 16, 0.85)', justifyContent: 'flex-end' },
+  voiceSheet: { backgroundColor: '#0b0f1a', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, paddingBottom: 40, borderTopWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' },
+  sheetHandle: { width: 40, height: 5, backgroundColor: '#5a6a85', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sheetTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  sheetCloseBtn: { padding: 4, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  voiceInstruct: { color: '#8fa3c0', fontSize: 14, lineHeight: 20, marginBottom: 20 },
+  visualizerContainer: { height: 120, justifyContent: 'center', alignItems: 'center', backgroundColor: '#050810', borderRadius: 20, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)' },
+  waveRow: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 100 },
+  waveBar: { width: 6, backgroundColor: '#00D4A8', borderRadius: 3 },
+  transcriptionBox: { minHeight: 80, backgroundColor: '#111827', borderRadius: 16, padding: 16, justifyContent: 'center', marginBottom: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  transcriptionText: { color: '#fff', fontSize: 16, fontWeight: '600', lineHeight: 24, textAlign: 'center' },
+  transcriptionInputText: { color: '#fff', fontSize: 16, fontWeight: '600', lineHeight: 24, textAlign: 'center', width: '100%', padding: 0 },
+  micControlCenter: { alignItems: 'center' },
+  listeningStateRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  redPulseDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ff4a4a', marginRight: 8 },
+  listeningStatusText: { color: '#8fa3c0', fontSize: 13, fontWeight: '700' },
+  tapToTalkText: { color: '#5a6a85', fontSize: 13, fontWeight: '600', marginBottom: 12 },
+  bigMicBtn: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#00D4A8', justifyContent: 'center', alignItems: 'center', shadowColor: '#00D4A8', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.4, shadowRadius: 15, elevation: 8 },
+  bigMicActive: { backgroundColor: '#ff4a4a', shadowColor: '#ff4a4a' },
+  bigMicDisabled: { backgroundColor: '#1a2035', shadowOpacity: 0 },
+  voiceActionRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 24 },
+  voicePrimaryBtn: { flex: 1.2, backgroundColor: '#00D4A8', paddingVertical: 14, borderRadius: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', shadowColor: '#00D4A8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
+  voicePrimaryBtnText: { color: '#050810', fontWeight: '800', fontSize: 14 },
+  voiceSecondaryBtn: { flex: 1, backgroundColor: '#111827', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingVertical: 14, borderRadius: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  voiceSecondaryBtnText: { color: '#8fa3c0', fontWeight: '700', fontSize: 14 },
 });
-
-
-
