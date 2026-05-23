@@ -1,46 +1,12 @@
-<<<<<<< HEAD
-# Python
-__pycache__/
-*.py[cod]
-*.so
-.Python
-venv/
-.venv/
-*.egg-info/
-.pytest_cache/
-
-# Environment
+# ── Environment & Secrets ──
 .env
-
-# IDE
-.idea/
-.vscode/
-.DS_Store
-
-# Runtime data (never commit — generated per request)
-**/logs/
-**/logs/*.json
-backend/data/bookings.json
-
-# Backup folders
-**/app.backup/
-**/backend-backup/
-
-# Node (Aqib's mobile)
-node_modules/
-.expo/
-*.log
-=======
-# ── Environment & Secrets ──────────────────────────────────────────
-.env
-.env.local
-.env.production
+.env.*
 *.key
 *.pem
 service-account.json
 google-credentials.json
 
-# ── Python (Backend) ────────────────────────────────────────────────
+# ── Python (Backend) ──
 __pycache__/
 *.py[cod]
 *.pyo
@@ -49,42 +15,27 @@ __pycache__/
 venv/
 env/
 .venv/
-dist/
-build/
 *.egg-info/
 .pytest_cache/
-.mypy_cache/
-htmlcov/
-.coverage
 
-# ── React Native + Expo (Mobile) ────────────────────────────────────
+# ── React / Mobile ──
 node_modules/
 .expo/
-.expo-shared/
 dist/
 web-build/
-*.jks
-*.p8
-*.p12
-*.mobileprovision
-*.orig.*
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# ── IDE & OS ────────────────────────────────────────────────────────
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
-
-# ── Logs ────────────────────────────────────────────────────────────
-logs/*.json
-!logs/sample_agent_trace.json
 *.log
 
-# ── Google Cloud ────────────────────────────────────────────────────
+# ── IDE & OS ──
+.vscode/
+.idea/
+.DS_Store
+
+# ── Project Specific Logs & Backups ──
+**/logs/
+**/logs/*.json
+backend/data/bookings.json
+**/app.backup/
+**/backend-backup/
+
+# ── Google Cloud ──
 .gcloud/
->>>>>>> 4f2cf1c (Add files via upload)
