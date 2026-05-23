@@ -162,9 +162,10 @@ const generateMockBookingResponse = (bookingData) => {
  * @param {number} lat - User latitude.
  * @param {number} lng - User longitude.
  */
-export const submitRequest = async (message, lat, lng) => {
+export const submitRequest = async (message, lat, lng, sessionId) => {
   try {
     const response = await api.post('/api/request', {
+      session_id: sessionId,
       message,
       user_lat: lat,
       user_lng: lng,

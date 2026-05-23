@@ -42,7 +42,7 @@ const PLACEHOLDERS = [
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // BACKEND API CONFIG
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tastiness-silly-strife.ngrok-free.dev';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://khidmat-ai-backend-bdg7lrfdza-el.a.run.app';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // UPLOAD AUDIO TO BACKEND → GEMINI TRANSCRIPTION
@@ -81,7 +81,7 @@ const uploadAudioForTranscription = async (audioUri) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ANTIGRAVITY VOICE INTENT FUNCTION
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const callAntigravityVoiceIntent = async (voiceText, location) => {
+const callAntigravityVoiceIntent = async (voiceText, location, sessionId) => {
   try {
     const response = await fetch(`${BASE_URL}/api/request`, {
       method: 'POST',
@@ -90,6 +90,7 @@ const callAntigravityVoiceIntent = async (voiceText, location) => {
         'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({
+        session_id: sessionId,
         text: voiceText,
         location: location || 'G-13, Islamabad',
         source: 'voice_input',
@@ -110,6 +111,7 @@ const callAntigravityVoiceIntent = async (voiceText, location) => {
 };
 
 export default function ChatScreen({ navigation, route }) {
+  const [sessionId] = useState(() => "SES-" + Date.now() + "-" + Math.floor(1000 + Math.random() * 9000));
   const [request, setRequest] = useState('');
   const inputRef = useRef(null);
   const [locationStr, setLocationStr] = useState('');
@@ -297,7 +299,7 @@ export default function ChatScreen({ navigation, route }) {
       setStatusMessage('✅ Transcription done! Intent extract ho raha hai...');
 
       // Step 2: Pass transcribed text to Antigravity for intent extraction
-      const intentText = await callAntigravityVoiceIntent(transcribedText, locationStr);
+      const intentText = await callAntigravityVoiceIntent(transcribedText, locationStr, sessionId);
 
       // Fill the request input and close modal
       setRequest(intentText);
@@ -328,7 +330,7 @@ export default function ChatScreen({ navigation, route }) {
     setIsProcessingIntent(true);
     setStatusMessage('🤖 Antigravity agent samajh raha hai...');
 
-    const intentText = await callAntigravityVoiceIntent(text, locationStr);
+    const intentText = await callAntigravityVoiceIntent(text, locationStr, sessionId);
 
     setRequest(intentText);
     setIsProcessingIntent(false);
@@ -376,7 +378,8 @@ export default function ChatScreen({ navigation, route }) {
     navigation.navigate('AgentThinking', { 
       request: request.trim(),
       user_lat: lat,
-      user_lng: lng
+      user_lng: lng,
+      session_id: sessionId
     });
   };
 

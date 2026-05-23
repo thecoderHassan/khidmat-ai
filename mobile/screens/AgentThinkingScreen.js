@@ -12,7 +12,7 @@ const THINKING_STEPS = [
 ];
 
 export default function AgentThinkingScreen({ navigation, route }) {
-  const { request, user_lat, user_lng } = route.params || { request: '', user_lat: 33.6938, user_lng: 72.9720 };
+  const { request, user_lat, user_lng, session_id } = route.params || { request: '', user_lat: 33.6938, user_lng: 72.9720, session_id: "SES-" + Date.now() };
   const [steps, setSteps] = useState(THINKING_STEPS);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,7 @@ export default function AgentThinkingScreen({ navigation, route }) {
     let visualDone = false;
 
     // 1. Start API request immediately
-    submitRequest(request, user_lat, user_lng)
+    submitRequest(request, user_lat, user_lng, session_id)
       .then((data) => {
         if (!active) return;
         apiData = data;
@@ -135,7 +135,7 @@ export default function AgentThinkingScreen({ navigation, route }) {
               💡 Dev Tip: Make sure your laptop and mobile device are on the same Wi-Fi network and your server is listening on your local LAN IP (e.g. 192.168.x.x), not localhost.
             </Text>
             
-            <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.replace('AgentThinking', { request, user_lat, user_lng })}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => navigation.replace('AgentThinking', { request, user_lat, user_lng, session_id })}>
               <Ionicons name="refresh" size={20} color="#050810" style={{ marginRight: 6 }} />
               <Text style={styles.retryBtnText}>Retry Matching</Text>
             </TouchableOpacity>
