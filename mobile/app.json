@@ -1,13 +1,23 @@
 {
   "expo": {
-    "name": "KhidmatAI",
+    "name": "Khidmat AI",
     "slug": "khidmat-ai",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050810"
+    },
     "ios": {
       "supportsTablet": false
     },
     "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0D1525"
+      },
       "config": {
         "googleMaps": {
           "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
@@ -19,6 +29,12 @@
       "eas": {
         "projectId": "16a6d6f3-b983-45ee-82a8-71ab9d578cb4"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/16a6d6f3-b983-45ee-82a8-71ab9d578cb4"
     }
   }
 }

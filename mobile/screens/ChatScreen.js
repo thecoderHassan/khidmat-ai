@@ -13,6 +13,7 @@ import {
   Animated, 
   Easing,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -385,10 +386,11 @@ export default function ChatScreen({ navigation, route }) {
         
         {/* Header */}
         <View style={styles.heroSection}>
-          <View style={styles.logoBadge}>
-            <Text style={styles.urduLogo}>خدمت</Text>
-          </View>
-          <Text style={styles.appName}>Khidmat<Text style={styles.aiText}>AI</Text></Text>
+          <Image 
+            source={require('../assets/images/logo-header.png')} 
+            style={{ width: 200, height: 60, marginBottom: 8 }} 
+            resizeMode="contain" 
+          />
           <Text style={styles.tagline}>Ghar Baithe, Kaam Karwao</Text>
         </View>
 
