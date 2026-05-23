@@ -72,7 +72,9 @@ export default function AgentThinkingScreen({ navigation, route }) {
         setTimeout(() => {
           navigation.replace('ProviderResults', { 
             results: apiData, 
-            request: request 
+            request: request,
+            user_lat,
+            user_lng
           });
         }, 300);
       }
