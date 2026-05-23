@@ -8,8 +8,8 @@ from agents.booking import run as booking_run
 
 # Simulates the POST /book body the app sends after the user taps a provider.
 book_request = {
-    "provider_id": "PRV-001",
-    "slot": "09:00",
+    "provider_id": "P001",
+    "slot": "2026-05-17T09:00:00+00:00",
     "service_type": "AC Technician",
     "session_id": "TEST-BOOK-001",
 }

@@ -138,20 +138,19 @@ def run(input_data: dict) -> dict:
             f"{service_type} providers found."
         )
 
-    write_trace({
-        "session_id": session_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "agent": "DiscoveryAgent",
-        "step": 2,
-        "input": {"service_type": service_type, "location": location, "time_iso": time_iso},
-        "reasoning": reasoning,
-        "tools_used": ["providers_json", "haversine_distance", "ranking"],
-        "output": {
+    write_trace(
+        session_id,
+        "DiscoveryAgent",
+        2,
+        input={"service_type": service_type, "location": location, "time_iso": time_iso},
+        reasoning=reasoning,
+        tools_used=["providers_json", "haversine_distance", "ranking"],
+        output={
             "providers_found": len(matched),
             "top_match": top_match["provider_id"] if top_match else None,
         },
-        "duration_ms": duration_ms,
-    })
+        duration_ms=duration_ms,
+    )
 
     return {
         "top_match": top_match,

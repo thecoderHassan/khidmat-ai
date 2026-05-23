@@ -188,22 +188,21 @@ def run(input_data: dict) -> dict:
 
     duration_ms = int((time.time() - start) * 1000)
 
-    write_trace({
-        "session_id": session_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "agent": "IntentAgent",
-        "step": 1,
-        "input": {"message": message},
-        "reasoning": (
+    write_trace(
+        session_id,
+        "IntentAgent",
+        1,
+        input={"message": message},
+        reasoning=(
             f"Detected {result.get('language_detected')}. "
             f"Extracted service_type={result.get('service_type')}, "
             f"location={result.get('location')}, "
             f"time={result.get('time_preference')}."
         ),
-        "tools_used": tools_used,
-        "output": result,
-        "duration_ms": duration_ms,
-    })
+        tools_used=tools_used,
+        output=result,
+        duration_ms=duration_ms,
+    )
 
     result["time_iso"] = normalize_time(result.get("time_preference"))
     result["session_id"] = session_id

@@ -111,17 +111,16 @@ def run(input_data: dict) -> dict:
 
     duration_ms = int((time.time() - start) * 1000)
 
-    write_trace({
-        "session_id": session_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "agent": "ConfirmationAgent",
-        "step": 3,
-        "input": {"provider_id": provider_id, "slot": slot, "service_type": service_type},
-        "reasoning": reasoning_text,
-        "tools_used": ["providers_json"],
-        "output": {"provider_id": provider_id, "confirmed_slot": confirmed_slot},
-        "duration_ms": duration_ms,
-    })
+    write_trace(
+        session_id,
+        "ConfirmationAgent",
+        3,
+        input={"provider_id": provider_id, "slot": slot, "service_type": service_type},
+        reasoning=reasoning_text,
+        tools_used=["providers_json"],
+        output={"provider_id": provider_id, "confirmed_slot": confirmed_slot},
+        duration_ms=duration_ms,
+    )
 
     return {
         "provider": provider,

@@ -133,20 +133,19 @@ def run(input_data: dict) -> dict:
 
     duration_ms = int((time.time() - start) * 1000)
 
-    write_trace({
-        "session_id": session_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "agent": "BookingAgent",
-        "step": 4,
-        "input": {"provider_id": provider.get("id"), "confirmed_slot": confirmed_slot},
-        "reasoning": (
+    write_trace(
+        session_id,
+        "BookingAgent",
+        4,
+        input={"provider_id": provider.get("id"), "confirmed_slot": confirmed_slot},
+        reasoning=(
             f"Confirmed booking {booking_id} with {provider_name} "
             f"for {service_type} {when}."
         ),
-        "tools_used": ["bookings_json"],
-        "output": {"booking_id": booking_id},
-        "duration_ms": duration_ms,
-    })
+        tools_used=["bookings_json"],
+        output={"booking_id": booking_id},
+        duration_ms=duration_ms,
+    )
 
     return {
         "booking_id": booking_id,
