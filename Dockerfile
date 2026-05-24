@@ -42,7 +42,7 @@ COPY --chown=appuser:appuser backend/main.py ./backend/main.py
 
 # Logs directory must be writable
 RUN mkdir -p /app/backend/logs /app/backend/data && \
-    chown -R appuser:appuser /app/backend/logs /app/backend/data
+    chown -R appuser:appuser /app/backend/logs /app/data
 
 USER appuser
 
