@@ -1,4 +1,4 @@
-# ── Environment & Secrets ──
+# Environment & Secrets
 .env
 .env.*
 *.key
@@ -6,36 +6,43 @@
 service-account.json
 google-credentials.json
 
-# ── Python (Backend) ──
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+*.so
 .Python
 venv/
 env/
 .venv/
 *.egg-info/
 .pytest_cache/
+.coverage
+htmlcov/
 
-# ── React / Mobile ──
+# React / Mobile
 node_modules/
 .expo/
 dist/
 web-build/
 *.log
 
-# ── IDE & OS ──
+# IDE & OS
 .vscode/
 .idea/
 .DS_Store
 
-# ── Project Specific Logs & Backups ──
+# Runtime data
+backend/data/bookings.json
 **/logs/
 **/logs/*.json
-backend/data/bookings.json
+logs/agent_trace_*.json
+
+# Backups
 **/app.backup/
 **/backend-backup/
+app.backup/
 
-# ── Google Cloud ──
+# Google Cloud
 .gcloud/
