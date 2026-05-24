@@ -49,4 +49,4 @@ USER appuser
 EXPOSE 8080
 
 # Cloud Run sets $PORT (defaults to 8080). Use shell form so $PORT expands.
-CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port \"${PORT}\" --workers 1 --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port \"${PORT:-8080}\" --workers 1 --proxy-headers --forwarded-allow-ips='*'"]
