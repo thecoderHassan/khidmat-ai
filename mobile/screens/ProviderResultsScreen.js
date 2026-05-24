@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Linking, ScrollView, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, ScrollView, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { parseISO, format } from 'date-fns';
+import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { bookSlot } from '../services/api';
 
 const LANGUAGE_MAP = {
@@ -12,8 +13,11 @@ const LANGUAGE_MAP = {
 };
 
 export default function ProviderResultsScreen({ navigation, route }) {
-  const { results, request } = route.params || {};
+  const { results, request, user_lat, user_lng } = route.params || {};
   const { session_id, intent, top_match, alternatives = [], trace_url } = results || {};
+  const [mapExpanded, setMapExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
+  const [selectedMapProvider, setSelectedMapProvider] = useState(null);
 
   const [expanded, setExpanded] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState({}); // Mapping of providerId -> rawISOString
@@ -256,6 +260,17 @@ export default function ProviderResultsScreen({ navigation, route }) {
     );
   }
 
+  // Map data helpers
+  const providerLat = top_match?.lat;
+  const providerLng = top_match?.lng;
+  const userLat = user_lat || 33.6938;
+  const userLng = user_lng || 72.9720;
+  const hasMapData = providerLat && providerLng;
+  const midLat = hasMapData ? (userLat + providerLat) / 2 : userLat;
+  const midLng = hasMapData ? (userLng + providerLng) / 2 : userLng;
+  const latDelta = hasMapData ? Math.abs(userLat - providerLat) * 2.2 + 0.01 : 0.05;
+  const lngDelta = hasMapData ? Math.abs(userLng - providerLng) * 2.2 + 0.01 : 0.05;
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -282,6 +297,114 @@ export default function ProviderResultsScreen({ navigation, route }) {
             </View>
           </View>
         </View>
+
+        {/* ─── List / Map Toggle ─── */}
+        {hasMapData && (
+          <View style={styles.viewToggleBar}>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleActive]}
+              onPress={() => setViewMode('list')}
+            >
+              <Ionicons name="list" size={16} color={viewMode === 'list' ? '#050810' : '#8fa3c0'} style={{ marginRight: 6 }} />
+              <Text style={[styles.viewToggleText, viewMode === 'list' && styles.viewToggleTextActive]}>List View</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, viewMode === 'map' && styles.viewToggleActive]}
+              onPress={() => { setViewMode('map'); setSelectedMapProvider(top_match); }}
+            >
+              <Ionicons name="map" size={16} color={viewMode === 'map' ? '#050810' : '#8fa3c0'} style={{ marginRight: 6 }} />
+              <Text style={[styles.viewToggleText, viewMode === 'map' && styles.viewToggleTextActive]}>Map View</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ─── FULL MAP VIEW ─── */}
+        {viewMode === 'map' && hasMapData && (
+          <View style={styles.fullMapContainer}>
+            <MapView
+              style={styles.fullMapView}
+              provider={PROVIDER_DEFAULT}
+              initialRegion={{
+                latitude: midLat,
+                longitude: midLng,
+                latitudeDelta: latDelta,
+                longitudeDelta: lngDelta,
+              }}
+              customMapStyle={darkMapStyle}
+            >
+              {/* User Marker */}
+              <Marker
+                coordinate={{ latitude: userLat, longitude: userLng }}
+                title="📱 You"
+                description="Your current location"
+              >
+                <View style={styles.userMarker}>
+                  <View style={styles.userMarkerInner} />
+                </View>
+              </Marker>
+
+              {/* Top Provider Marker */}
+              <Marker
+                coordinate={{ latitude: providerLat, longitude: providerLng }}
+                title={`🔧 ${top_match.name}`}
+                description={`${top_match.area} · ${top_match.distance_km?.toFixed(1) ?? '?'} km`}
+                onPress={() => setSelectedMapProvider(top_match)}
+              >
+                <View style={[styles.providerMarker, styles.providerMarkerBest]}>
+                  <Ionicons name="trophy" size={14} color="#050810" />
+                </View>
+              </Marker>
+
+              {/* Alternative Providers Markers */}
+              {validAlternatives.map((p) => p?.lat && p?.lng ? (
+                <Marker
+                  key={p.id}
+                  coordinate={{ latitude: p.lat, longitude: p.lng }}
+                  title={`🔧 ${p.name}`}
+                  description={`${p.area} · ${p.distance_km?.toFixed(1) ?? '?'} km`}
+                  onPress={() => setSelectedMapProvider(p)}
+                >
+                  <View style={styles.providerMarker}>
+                    <Ionicons name="construct" size={12} color="#050810" />
+                  </View>
+                </Marker>
+              ) : null)}
+
+              {/* Dashed Route Line */}
+              <Polyline
+                coordinates={[
+                  { latitude: userLat, longitude: userLng },
+                  { latitude: providerLat, longitude: providerLng },
+                ]}
+                strokeColor="#00D4A8"
+                strokeWidth={2}
+                lineDashPattern={[6, 4]}
+              />
+            </MapView>
+
+            {/* Bottom Info Card for selected provider */}
+            {selectedMapProvider && (
+              <View style={styles.mapInfoCard}>
+                <View style={styles.mapInfoLeft}>
+                  <Text style={styles.mapInfoName}>{selectedMapProvider.name}</Text>
+                  <Text style={styles.mapInfoSub}>
+                    {selectedMapProvider.area} · ⭐ {selectedMapProvider.rating?.toFixed(1)}
+                  </Text>
+                  <Text style={styles.mapInfoDist}>
+                    📍 {selectedMapProvider.distance_km?.toFixed(1) ?? '?'} km away · {selectedMapProvider.price_range}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.mapInfoBookBtn}
+                  onPress={() => { setViewMode('list'); }}
+                >
+                  <Text style={styles.mapInfoBookText}>View</Text>
+                  <Ionicons name="chevron-forward" size={14} color="#050810" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Top Matches Section */}
         <View style={styles.sectionHeader}>
@@ -413,9 +536,73 @@ export default function ProviderResultsScreen({ navigation, route }) {
   );
 }
 
+// Dark map style for OpenStreetMap-based tiles (works with PROVIDER_DEFAULT)
+const darkMapStyle = [
+  { elementType: 'geometry', stylers: [{ color: '#0b0f1a' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8fa3c0' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#050810' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1b2336' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#111827' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+];
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#050810' },
   scrollContent: { padding: 16, paddingBottom: 100 },
+
+  // Map Card
+  mapCard: {
+    backgroundColor: '#0b0f1a',
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,212,168,0.2)',
+  },
+  mapCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 14,
+    paddingBottom: 10,
+  },
+  mapCardTitle: { color: '#FFF', fontSize: 14, fontWeight: '700' },
+  mapDistancePill: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(59,158,255,0.1)',
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+    borderWidth: 1, borderColor: 'rgba(59,158,255,0.2)',
+  },
+  mapDistanceText: { color: '#3b9eff', fontSize: 11, fontWeight: '700' },
+  mapView: { width: '100%', height: 180 },
+  mapViewExpanded: { height: 300 },
+  userMarker: {
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(59,158,255,0.3)',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#3b9eff',
+  },
+  userMarkerInner: {
+    width: 10, height: 10, borderRadius: 5, backgroundColor: '#3b9eff',
+  },
+  providerMarker: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: '#00D4A8',
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 2, borderColor: '#fff',
+    elevation: 4,
+  },
+  mapLegend: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 10, paddingHorizontal: 14, gap: 14,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  legendDotUser: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#3b9eff' },
+  legendDotProvider: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#00D4A8' },
+  legendText: { color: '#8fa3c0', fontSize: 11, fontWeight: '600' },
+  expandMapBtn: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4 },
+  expandMapText: { color: '#8fa3c0', fontSize: 11 },
   
   header: { marginBottom: 20 },
   headerTitle: { fontSize: 28, fontWeight: '900', color: '#FFF', letterSpacing: -0.5, marginBottom: 12 },
