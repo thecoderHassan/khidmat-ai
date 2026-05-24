@@ -32,6 +32,8 @@ COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 COPY --chown=appuser:appuser app/ ./app/
 COPY --chown=appuser:appuser data/ ./data/
 COPY --chown=appuser:appuser agents/ ./agents/
+COPY --chown=appuser:appuser utils/ ./utils/
+COPY --chown=appuser:appuser main.py ./
 
 # Logs directory must be writable
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs /app/data
@@ -41,9 +43,4 @@ USER appuser
 EXPOSE 8080
 
 # Cloud Run sets $PORT (defaults to 8080). Use shell form so $PORT expands.
-CMD exec uvicorn app.main:app \
-    --host 0.0.0.0 \
-    --port "${PORT}" \
-    --workers 1 \
-    --proxy-headers \
-    --forwarded-allow-ips='*'
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port \"${PORT}\" --workers 1 --proxy-headers --forwarded-allow-ips='*'"]
