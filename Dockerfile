@@ -31,12 +31,14 @@ RUN groupadd -r appuser && useradd -r -g appuser -u 1000 -m appuser
 # Copy installed packages from builder
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 
-# Copy app code
-COPY --chown=appuser:appuser app/ ./app/
-COPY --chown=appuser:appuser data/ ./data/
-COPY --chown=appuser:appuser agents/ ./agents/
-COPY --chown=appuser:appuser utils/ ./utils/
-COPY --chown=appuser:appuser main.py ./
+# Copy the folders from the backend directory to the container
+COPY --chown=appuser:appuser backend/app ./app
+COPY --chown=appuser:appuser backend/data ./data
+COPY --chown=appuser:appuser backend/agents ./agents
+COPY --chown=appuser:appuser backend/utils ./utils
+
+# Copy the main execution file
+COPY --chown=appuser:appuser backend/main.py ./
 
 # Logs directory must be writable
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs /app/data
