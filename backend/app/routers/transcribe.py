@@ -47,7 +47,7 @@ _TRANSCRIBE_PROMPT = """You are the transcription engine for KhidmatAI, a Pakist
   Output: Bhai AC service کی کتنی fees ہے؟
 
 ### Strict Rule:
-Provide ONLY the raw transcription text matching the format of the outputs above. Absolutely no conversational filler, introductions, or explanations."""
+Provide ONLY the raw transcription text matching the format of the outputs above. Absolutely no conversational filler, introductions, or explanations"""
 
 
 class TranscribeResponse(BaseModel):
@@ -123,4 +123,5 @@ async def transcribe_audio(audio: UploadFile = File(...)):
         raise HTTPException(
             status_code=500,
             detail=f"Transcription failed: {str(exc)[:200]}",
+
         )
