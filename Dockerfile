@@ -1,5 +1,5 @@
 # Multi-stage build for small final image
-FROM python:3.10-slim AS builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /build
 ENV PIP_NO_CACHE_DIR=1 PYTHONDONTWRITEBYTECODE=1
@@ -13,7 +13,7 @@ COPY requirements.txt .
 RUN pip install --user --no-warn-script-location -r requirements.txt
 
 # ─── Runtime image ───────────────────────────────────────────────────────────
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
