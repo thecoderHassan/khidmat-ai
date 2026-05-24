@@ -10,9 +10,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
 from app.config import get_settings
-from app.routers import agents, aliases, health, transcribe  # Added by aqib for voice testing, can remove if any issue
+from app.routers import agents, aliases, health, transcribe  # Added by aqib for voice testing, can remove if any issues
+
 from app.services.bookings import get_booking_repo
 from app.services.providers import get_provider_repo
 
@@ -99,6 +99,7 @@ def create_app() -> FastAPI:
     app.include_router(agents.router)
     app.include_router(aliases.router)
     app.include_router(transcribe.router)  # Added by aqib for voice testing, can remove if any issue
+
 
     return app
 
