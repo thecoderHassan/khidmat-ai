@@ -15,6 +15,9 @@ RUN pip install --user --no-warn-script-location -r requirements.txt
 # ─── Runtime image ───────────────────────────────────────────────────────────
 FROM python:3.11-slim
 
+# Update system packages to patch OS-level security vulnerabilities
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
