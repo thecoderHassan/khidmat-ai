@@ -19,8 +19,7 @@ echo "   Project : $PROJECT_ID"
 echo "   Region  : $REGION"
 echo "   Image   : $IMAGE"
 
-# Build & push Docker image
-cd backend
+# Build & push Docker image using root Dockerfile
 gcloud builds submit --tag $IMAGE .
 
 # Deploy to Cloud Run
