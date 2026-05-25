@@ -82,10 +82,10 @@ async def transcribe_audio(audio: UploadFile = File(...)):
     logger.info("Audio size: %d bytes", len(audio_bytes))
 
     try:
-        from google import genai
+        import google.genai as google_genai
         from google.genai import types
 
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        client = google_genai.Client(api_key=GEMINI_API_KEY)
 
         # Upload audio as inline data to Gemini
         response = client.models.generate_content(

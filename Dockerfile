@@ -23,7 +23,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/home/appuser/.local/bin:${PATH}" \
-    PORT=8080
+    PORT=8080 PYTHONPATH=/app
 
 # Non-root user — Cloud Run best practice
 RUN groupadd -r appuser && useradd -r -g appuser -u 1000 -m appuser
@@ -42,11 +42,11 @@ COPY --chown=appuser:appuser backend/main.py ./backend/main.py
 
 # Logs directory must be writable
 RUN mkdir -p /app/backend/logs /app/backend/data && \
-    chown -R appuser:appuser /app/backend/logs /app/data
+    chown -R appuser:appuser /app/backend/logs /app/backend/data
 
 USER appuser
 
 EXPOSE 8080
 
 # Cloud Run sets $PORT (defaults to 8080). Use shell form so $PORT expands.
-CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port \"${PORT:-8080}\" --workers 1 --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "exec uvicorn backend.main:app --host 0.0.0.0 --port \"${PORT:-8080}\" --workers 1 --proxy-headers --forwarded-allow-ips='*'"]
