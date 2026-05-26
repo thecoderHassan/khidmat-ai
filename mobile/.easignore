@@ -1,0 +1,9 @@
+# Ignore Gemini CLI config — causes EPERM symlink error on Windows EAS builds
+.gemini/
+*.gemini
+
+# Ignore local env and cache
+.env
+.expo/
+dist/
+node_modules/

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, Linking, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { parseISO, format } from 'date-fns';
-import { getFollowupActions, updateBookingStatus, completeBooking, getBookingDetails } from '../services/api';
+import { getFollowupActions, updateBookingStatus, completeBooking, getBookingDetails, cancelBooking } from '../services/api';
 
 export default function BookingConfirmScreen({ navigation, route }) {
   const { bookingResponse, booking: paramBooking, receipt: paramReceipt, bookingId: paramBookingId, provider, session_id } = route.params || {};
@@ -17,10 +17,16 @@ export default function BookingConfirmScreen({ navigation, route }) {
   const [actionsLoading, setActionsLoading] = useState(false);
   const [receiptExpanded, setReceiptExpanded] = useState(false);
 
-  // Local feedback modal state
+  // Local feedback/review modal state
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [rating, setRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
+  // Cancellation modal state
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const bookingId = booking?.booking_id || paramBookingId || bookingResponse?.booking_id || "BK-UNKNOWN";
   const activeSessionId = session_id || booking?.session_id;
@@ -53,13 +59,16 @@ export default function BookingConfirmScreen({ navigation, route }) {
       }
     } catch (e) {
       console.warn("Could not fetch followup actions:", e);
-      // Fallback actions if API fails
-      setActions([
-        { action: "reminder", label: "Set Reminder", payload: {} },
-        { action: "contact", label: "Contact Expert", payload: { phone: booking?.provider_phone || provider?.phone } },
-        { action: "rebook", label: "Rebook Service", payload: {} },
-        { action: "rate_service", label: "Rate Service", payload: {} }
-      ]);
+      const baseActions = [
+        { action: "reminder", label: "Remind me 1 hour before", payload: {} },
+        { action: "contact", label: `Call ${booking?.provider_name || provider?.name || 'Expert'}`, payload: { phone: booking?.provider_phone || provider?.phone } },
+        { action: "book_another", label: "Book Another Service", payload: {} }
+      ];
+      // Rate service only shown after completion
+      if (booking?.status === 'completed') {
+        baseActions.push({ action: "rate_service", label: `Rate ${booking?.provider_name || provider?.name || 'Service'}`, payload: {} });
+      }
+      setActions(baseActions);
     } finally {
       setActionsLoading(false);
     }
@@ -85,12 +94,39 @@ export default function BookingConfirmScreen({ navigation, route }) {
     try {
       const updated = await completeBooking(bookingId);
       setBooking(updated?.booking || updated || { ...booking, status: "completed" });
-      Alert.alert("Service Delivered", "Work marked as complete. Thank you!");
+      // Auto-show review modal after completion
+      setTimeout(() => {
+        setFeedbackSubmitted(false);
+        setRating(5);
+        setReviewComment('');
+        setFeedbackVisible(true);
+      }, 500);
     } catch (e) {
       console.error(e);
       Alert.alert("Error", "Failed to complete service.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelBooking = async () => {
+    const trimmedReason = cancelReason.trim();
+    if (!trimmedReason || trimmedReason.length < 5) {
+      Alert.alert("Reason Required", "Please provide a reason for cancellation (at least 5 characters).");
+      return;
+    }
+    setCancelLoading(true);
+    try {
+      const updated = await cancelBooking(bookingId, trimmedReason);
+      setBooking(updated?.booking || updated || { ...booking, status: "cancelled" });
+      setCancelModalVisible(false);
+      setCancelReason('');
+      Alert.alert("Booking Cancelled", "Your booking has been cancelled successfully.");
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Failed to cancel booking. Please try again.");
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -109,15 +145,15 @@ export default function BookingConfirmScreen({ navigation, route }) {
         break;
 
       case 'rebook':
-        // Prefill input on home screen
-        navigation.navigate('Chat', { 
-          prefilledText: `Mujhe dobara ${booking?.service_type || 'AC Technician'} ki zaroorat hai` 
-        });
+      case 'book_another':
+        // Book another service — user should go home and book fresh
+        navigation.popToTop();
         break;
 
       case 'rate_service':
         setFeedbackSubmitted(false);
         setRating(5);
+        setReviewComment('');
         setFeedbackVisible(true);
         break;
 
@@ -279,14 +315,14 @@ export default function BookingConfirmScreen({ navigation, route }) {
           <ActivityIndicator size="small" color="#00D4A8" style={{ marginVertical: 15 }} />
         ) : (
           <View style={styles.actionGrid}>
-            {actions.map((act, index) => {
+            {actions.filter(act => act.action !== 'rate_service' || booking?.status === 'completed').map((act, index) => {
               let iconName = "sparkles-outline";
               let btnStyle = styles.actionBtn;
               let txtStyle = styles.actionBtnText;
 
               if (act.action === 'reminder') { iconName = "alarm-outline"; }
               else if (act.action === 'contact') { iconName = "call-outline"; btnStyle = [styles.actionBtn, styles.actionBtnBlue]; txtStyle = [styles.actionBtnText, styles.actionBtnTextBlue]; }
-              else if (act.action === 'rebook') { iconName = "refresh-outline"; }
+              else if (act.action === 'rebook' || act.action === 'book_another') { iconName = "add-circle-outline"; }
               else if (act.action === 'rate_service') { iconName = "star-outline"; }
 
               return (
@@ -306,23 +342,44 @@ export default function BookingConfirmScreen({ navigation, route }) {
           ) : (
             <>
               {booking?.status === 'confirmed' && (
-                <TouchableOpacity style={styles.statusConfirmBtn} onPress={handleStartService}>
-                  <Ionicons name="play-sharp" size={20} color="#050810" style={{ marginRight: 6 }} />
-                  <Text style={styles.statusConfirmBtnText}>Mark as Started</Text>
-                </TouchableOpacity>
+                <View style={{ gap: 12 }}>
+                  <TouchableOpacity style={styles.statusConfirmBtn} onPress={handleStartService}>
+                    <Ionicons name="play-sharp" size={20} color="#050810" style={{ marginRight: 6 }} />
+                    <Text style={styles.statusConfirmBtnText}>Mark as Started</Text>
+                  </TouchableOpacity>
+                  {/* Cancel only allowed before service starts */}
+                  <TouchableOpacity style={styles.cancelBookingBtn} onPress={() => setCancelModalVisible(true)}>
+                    <Ionicons name="close-circle-outline" size={20} color="#ff6b6b" style={{ marginRight: 6 }} />
+                    <Text style={styles.cancelBookingBtnText}>Cancel Booking</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               {booking?.status === 'in_progress' && (
-                <TouchableOpacity style={styles.statusDoneBtn} onPress={handleCompleteService}>
-                  <Ionicons name="checkmark-done" size={20} color="#050810" style={{ marginRight: 6 }} />
-                  <Text style={styles.statusDoneBtnText}>Mark as Done</Text>
-                </TouchableOpacity>
+                <View style={{ gap: 12 }}>
+                  <TouchableOpacity style={styles.statusDoneBtn} onPress={handleCompleteService}>
+                    <Ionicons name="checkmark-done" size={20} color="#050810" style={{ marginRight: 6 }} />
+                    <Text style={styles.statusDoneBtnText}>Mark as Done</Text>
+                  </TouchableOpacity>
+                  {/* Info: cancel not allowed once started */}
+                  <View style={styles.cancelBlockedNote}>
+                    <Ionicons name="lock-closed-outline" size={14} color="#5a6a85" style={{ marginRight: 6 }} />
+                    <Text style={styles.cancelBlockedNoteText}>Cancellation not allowed once service has started</Text>
+                  </View>
+                </View>
               )}
 
               {booking?.status === 'completed' && (
                 <View style={styles.completedBadgeRow}>
                   <Ionicons name="checkbox" size={22} color="#00D4A8" />
                   <Text style={styles.completedBadgeText}>Service delivered successfully</Text>
+                </View>
+              )}
+
+              {booking?.status === 'cancelled' && (
+                <View style={styles.cancelledBadgeRow}>
+                  <Ionicons name="close-circle" size={22} color="#ff6b6b" />
+                  <Text style={styles.cancelledBadgeText}>Booking Cancelled</Text>
                 </View>
               )}
             </>
@@ -346,7 +403,56 @@ export default function BookingConfirmScreen({ navigation, route }) {
 
       </ScrollView>
 
-      {/* Local Star Rating Modal */}
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          CANCEL BOOKING MODAL
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <Modal
+        visible={cancelModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCancelModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.feedbackCard}>
+            <Ionicons name="close-circle" size={48} color="#ff6b6b" style={{ marginBottom: 12 }} />
+            <Text style={styles.feedbackTitle}>Cancel Booking</Text>
+            <Text style={styles.feedbackSubtitle}>Please tell us why you want to cancel. This helps us improve our service.</Text>
+
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="e.g. Provider not responding, scheduling conflict..."
+              placeholderTextColor="#3a4a65"
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+
+            <View style={styles.feedbackModalActions}>
+              <TouchableOpacity style={styles.cancelRateBtn} onPress={() => { setCancelModalVisible(false); setCancelReason(''); }}>
+                <Text style={styles.cancelRateBtnText}>Go Back</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.submitRateBtn, { backgroundColor: '#ff6b6b' }]}
+                onPress={handleCancelBooking}
+                disabled={cancelLoading}
+              >
+                {cancelLoading ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.submitRateBtnText}>Confirm Cancel</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          REVIEW MODAL (Auto after completion)
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <Modal
         visible={feedbackVisible}
         transparent={true}
@@ -364,14 +470,14 @@ export default function BookingConfirmScreen({ navigation, route }) {
               </View>
             ) : (
               <>
-                <Text style={styles.feedbackSubtitle}>How was the service provided by {booking?.provider_name || provider?.name}?</Text>
+                <Text style={styles.feedbackSubtitle}>How was the service by {booking?.provider_name || provider?.name}?</Text>
                 
                 <View style={styles.starsRow}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <TouchableOpacity key={star} onPress={() => setRating(star)}>
                       <Ionicons 
                         name={star <= rating ? "star" : "star-outline"} 
-                        size={38} 
+                        size={36} 
                         color="#ffd060" 
                         style={{ marginHorizontal: 4 }}
                       />
@@ -379,9 +485,20 @@ export default function BookingConfirmScreen({ navigation, route }) {
                   ))}
                 </View>
 
+                <TextInput
+                  style={[styles.reasonInput, { marginBottom: 16 }]}
+                  placeholder="Write your experience (optional)..."
+                  placeholderTextColor="#3a4a65"
+                  value={reviewComment}
+                  onChangeText={setReviewComment}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+
                 <View style={styles.feedbackModalActions}>
                   <TouchableOpacity style={styles.cancelRateBtn} onPress={() => setFeedbackVisible(false)}>
-                    <Text style={styles.cancelRateBtnText}>Cancel</Text>
+                    <Text style={styles.cancelRateBtnText}>Skip</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity style={styles.submitRateBtn} onPress={handleFeedbackSubmit}>
@@ -390,7 +507,6 @@ export default function BookingConfirmScreen({ navigation, route }) {
                 </View>
               </>
             )}
-
           </View>
         </View>
       </Modal>
@@ -560,21 +676,74 @@ const styles = StyleSheet.create({
   },
   homeBtnText: { color: '#8fa3c0', fontSize: 14, fontWeight: '600' },
 
-  // Feedback Modal Style
+  // Cancel Booking Button
+  cancelBookingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,107,107,0.06)',
+    borderColor: 'rgba(255,107,107,0.3)',
+    borderWidth: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    width: '100%'
+  },
+  cancelBookingBtnText: { color: '#ff6b6b', fontSize: 15, fontWeight: '700' },
+
+  // Cancellation blocked note
+  cancelBlockedNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14
+  },
+  cancelBlockedNoteText: { color: '#5a6a85', fontSize: 12, fontStyle: 'italic' },
+
+  // Cancelled badge
+  cancelledBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,107,107,0.06)',
+    borderColor: 'rgba(255,107,107,0.2)',
+    borderWidth: 1,
+    padding: 16,
+    borderRadius: 14,
+    width: '100%'
+  },
+  cancelledBadgeText: { color: '#ff6b6b', fontSize: 15, fontWeight: '700', marginLeft: 8 },
+
+  // Reason text input
+  reasonInput: {
+    width: '100%',
+    backgroundColor: '#0b0f1a',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    color: '#FFF',
+    padding: 14,
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 20,
+    minHeight: 100
+  },
+
+  // Modals
   modalOverlay: { flex: 1, backgroundColor: 'rgba(5, 8, 16, 0.85)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   feedbackCard: { 
     backgroundColor: '#111827', 
     borderRadius: 20, 
     padding: 24, 
     width: '100%', 
-    maxWidth: 340, 
+    maxWidth: 360, 
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)'
   },
   feedbackTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
-  feedbackSubtitle: { color: '#8fa3c0', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  starsRow: { flexDirection: 'row', justifyContent: 'center', marginBottom: 24 },
+  feedbackSubtitle: { color: '#8fa3c0', fontSize: 13, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  starsRow: { flexDirection: 'row', justifyContent: 'center', marginBottom: 16 },
   feedbackModalActions: { flexDirection: 'row', gap: 12, width: '100%' },
   cancelRateBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#1b2336', alignItems: 'center' },
   cancelRateBtnText: { color: '#8fa3c0', fontWeight: 'bold', fontSize: 14 },

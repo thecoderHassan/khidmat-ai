@@ -73,8 +73,13 @@ export default function AgentThinkingScreen({ navigation, route }) {
           navigation.replace('ProviderResults', { 
             results: apiData, 
             request: request,
+<<<<<<< Updated upstream
             user_lat,
             user_lng
+=======
+            user_lat: user_lat,
+            user_lng: user_lng
+>>>>>>> Stashed changes
           });
         }, 300);
       }
