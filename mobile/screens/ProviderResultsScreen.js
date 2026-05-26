@@ -1,9 +1,17 @@
+<<<<<<< Updated upstream
 import React, { useState } from 'react';
+=======
+import React, { useState, useRef } from 'react';
+>>>>>>> Stashed changes
 import { View, Text, StyleSheet, TouchableOpacity, Linking, ScrollView, Modal, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { parseISO, format } from 'date-fns';
+<<<<<<< Updated upstream
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
+=======
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+>>>>>>> Stashed changes
 import { bookSlot } from '../services/api';
 
 const LANGUAGE_MAP = {
@@ -12,84 +20,159 @@ const LANGUAGE_MAP = {
   en: "English"
 };
 
+<<<<<<< Updated upstream
 export default function ProviderResultsScreen({ navigation, route }) {
   const { results, request, user_lat, user_lng } = route.params || {};
   const { session_id, intent, top_match, alternatives = [], trace_url } = results || {};
   const [mapExpanded, setMapExpanded] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'map'
   const [selectedMapProvider, setSelectedMapProvider] = useState(null);
+=======
+// Fix #6: Pakistan city traffic ~25 km/h realistic estimate
+const CITY_SPEED_KMH = 25;
+>>>>>>> Stashed changes
 
+export default function ProviderResultsScreen({ navigation, route }) {
+  const { results, request, user_lat, user_lng } = route.params || {};
+  const { session_id, intent, top_match, alternatives = [] } = results || {};
+
+  const scrollViewRef = useRef(null);
+  const mapRef = useRef(null);
+  const cardRefs = useRef({});
+
+  // Fix #5: Single source of truth — activeRouteProvider drives both highlight + route
+  const [activeRouteProvider, setActiveRouteProvider] = useState(null);
   const [expanded, setExpanded] = useState(false);
-  const [selectedSlots, setSelectedSlots] = useState({}); // Mapping of providerId -> rawISOString
+  const [selectedSlots, setSelectedSlots] = useState({});
   const [bookingModalVisible, setBookingModalVisible] = useState(false);
   const [bookingProvider, setBookingProvider] = useState(null);
-  
-  // User booking details
-  const [userName, setUserName] = useState('Aqib Raza');
-  const [userPhone, setUserPhone] = useState('03001234567');
+
+  // Fix #4: Empty defaults so user fills their own info
+  const [userName, setUserName] = useState('');
+  const [userPhone, setUserPhone] = useState('');
   const [bookingLoading, setBookingLoading] = useState(false);
 
-  // Intent details formatting
+  // Fix #7: Map height expands when route is active
+  const mapHeight = activeRouteProvider ? 300 : 220;
+
   const serviceType = intent?.service_type || "Service Expert";
   const rawTimeIso = intent?.time_iso;
-  const timeLabel = rawTimeIso 
-    ? format(parseISO(rawTimeIso), "eee, MMM d 'at' h:mm a") 
+  const timeLabel = rawTimeIso
+    ? format(parseISO(rawTimeIso), "eee, MMM d 'at' h:mm a")
     : (intent?.time_preference || "As soon as possible");
   const langLabel = LANGUAGE_MAP[intent?.language_detected] || "Auto-detected";
 
-  // Filter out any null alternatives or empty lists
   const validAlternatives = (alternatives || []).filter(item => item !== null);
   const displayProviders = expanded ? validAlternatives : [];
 
-  const handleCall = (phone) => {
-    Linking.openURL(`tel:${phone}`).catch(() => {
-      Alert.alert("Dialer Error", "Could not open dialer app.");
+  // ─────────────────────────────────────────────
+  // Fix #1: Haversine — returns km, walk, drive
+  // ─────────────────────────────────────────────
+  const calcDistanceInfo = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return { km: null, driveMins: null, walkMins: null };
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const km = parseFloat((R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
+    return {
+      km,
+      driveMins: Math.round((km / CITY_SPEED_KMH) * 60),  // Fix #6: realistic city speed
+      walkMins: Math.round((km / 5) * 60),                 // Fix #1: walk shown in banner
+    };
+  };
+
+  // ─────────────────────────────────────────────
+  // Fix #2: Reliable scroll using y offset accumulation
+  // ─────────────────────────────────────────────
+  const cardYOffsets = useRef({});
+
+  const handleMarkerPress = (provider) => {
+    // Fix #5: sync both states together
+    setActiveRouteProvider(provider);
+    if (provider.id !== top_match?.id && !expanded) {
+      setExpanded(true);
+      setTimeout(() => scrollToCard(provider.id), 450);
+    } else {
+      scrollToCard(provider.id);
+    }
+  };
+
+  const scrollToCard = (providerId) => {
+    const y = cardYOffsets.current[providerId];
+    if (y !== undefined && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: y - 16, animated: true });
+    }
+  };
+
+  // ─────────────────────────────────────────────
+  // View on Map — route line + fit both pins
+  // ─────────────────────────────────────────────
+  const handleViewOnMap = (provider) => {
+    // Navigate to fullscreen map screen
+    navigation.navigate('ProviderMap', {
+      provider,
+      user_lat,
+      user_lng,
     });
   };
 
+  const handleCall = (phone) => {
+    Linking.openURL(`tel:${phone}`).catch(() => Alert.alert("Dialer Error", "Could not open dialer app."));
+  };
+
   const initiateBooking = (provider) => {
-    const selectedSlot = selectedSlots[provider.id];
-    if (!selectedSlot) {
+    if (!selectedSlots[provider.id]) {
       Alert.alert("Time Slot Required", `Please select an available slot for ${provider.name} before booking.`);
       return;
     }
+    // Fix #3: always reset booking form when opening modal
+    setUserName('');
+    setUserPhone('');
     setBookingProvider(provider);
     setBookingModalVisible(true);
   };
 
+  // Fix #9: phone number validation
+  const isValidPhone = (phone) => /^03[0-9]{9}$/.test(phone.trim());
+
   const handleConfirmBooking = async () => {
-    if (!userName.trim() || !userPhone.trim()) {
-      Alert.alert("Fields Required", "Please provide your Name and Phone Number to complete the booking.");
+    if (!userName.trim()) {
+      Alert.alert("Name Required", "Please enter your name.");
       return;
     }
-
+    // Fix #9: validate Pakistani phone format
+    if (!isValidPhone(userPhone)) {
+      Alert.alert("Invalid Phone", "Please enter a valid Pakistani number (e.g. 03001234567).");
+      return;
+    }
     setBookingLoading(true);
     try {
-      const selectedSlot = selectedSlots[bookingProvider.id];
       const payload = {
         session_id,
         provider_id: bookingProvider.id,
-        slot: selectedSlot,
+        slot: selectedSlots[bookingProvider.id],
         user_name: userName.trim(),
         user_phone: userPhone.trim(),
       };
-
       const response = await bookSlot(payload);
-      
       setBookingModalVisible(false);
-      // Navigate to Confirmation screen with the booking response and selected provider
-      navigation.navigate('BookingConfirm', { 
+      // Fix #3: clear stale state after successful booking
+      setBookingProvider(null);
+      navigation.navigate('BookingConfirm', {
         bookingResponse: response,
         booking: response?.booking,
         receipt: response?.receipt,
         bookingId: response?.booking?.booking_id || response?.booking_id,
         provider: bookingProvider,
-        session_id: session_id
+        session_id,
       });
     } catch (error) {
-      console.error("Booking failed:", error);
-      const errMsg = error?.response?.status === 409 
-        ? "This slot has already been booked by another user. Please select a different slot." 
+      const errMsg = error?.response?.status === 409
+        ? "This slot has already been booked. Please select a different slot."
         : (error?.response?.data?.message || error.message || "An unexpected booking error occurred.");
       Alert.alert("Booking Failed", errMsg);
     } finally {
@@ -98,11 +181,8 @@ export default function ProviderResultsScreen({ navigation, route }) {
   };
 
   const formatSlot = (isoString) => {
-    try {
-      return format(parseISO(isoString), "eee h:mm a");
-    } catch (e) {
-      return isoString;
-    }
+    try { return format(parseISO(isoString), "eee h:mm a"); }
+    catch (e) { return isoString; }
   };
 
   const renderScoreBars = (provider) => {
@@ -119,7 +199,7 @@ export default function ProviderResultsScreen({ navigation, route }) {
             <View style={styles.scoreBarBg}>
               <View style={[styles.scoreBarFill, { width: `${s.val * 100}%`, backgroundColor: s.color }]} />
             </View>
-            <Text style={styles.scoreBarVal}>{(s.val).toFixed(1)}</Text>
+            <Text style={styles.scoreBarVal}>{s.val.toFixed(1)}</Text>
           </View>
         ))}
       </View>
@@ -127,14 +207,29 @@ export default function ProviderResultsScreen({ navigation, route }) {
   };
 
   const renderProviderCard = (provider, isBestMatch) => {
-    const scoreVal = provider.score ? (provider.score).toFixed(2) : "0.00";
+    // Fix #5: single state for both highlight and route
+    const isRouteActive = activeRouteProvider?.id === provider.id;
+    const scoreVal = provider.score ? provider.score.toFixed(2) : "0.00";
     const initials = provider.name.split(' ').map(n => n[0]).join('').substring(0, 2);
     const slots = provider.available_slots || [];
     const activeSelectedSlot = selectedSlots[provider.id];
+    const { km: dist, driveMins } = calcDistanceInfo(user_lat, user_lng, provider.lat, provider.lng);
+    const displayDist = provider.distance_km || dist;
+    const displayDrive = provider.distance_km
+      ? Math.round((provider.distance_km / CITY_SPEED_KMH) * 60)
+      : driveMins;
 
     return (
-      <View key={provider.id} style={[styles.card, isBestMatch && styles.bestMatchCard]}>
-        
+      <View
+        key={provider.id}
+        // Fix #2: capture y offset reliably via onLayout
+        onLayout={(e) => { cardYOffsets.current[provider.id] = e.nativeEvent.layout.y; }}
+        style={[
+          styles.card,
+          isBestMatch && styles.bestMatchCard,
+          isRouteActive && styles.cardHighlighted,
+        ]}
+      >
         {/* Card Header */}
         <View style={styles.cardHeader}>
           <View style={styles.profileAvatar}>
@@ -147,7 +242,6 @@ export default function ProviderResultsScreen({ navigation, route }) {
                 <Text style={styles.scoreBadgeText}>{scoreVal}/1.00</Text>
               </View>
             </View>
-            
             <View style={styles.badgeRow}>
               {isBestMatch && (
                 <View style={styles.bestMatchBadge}>
@@ -162,13 +256,13 @@ export default function ProviderResultsScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Categories & Price pills */}
+        {/* Categories & Pills */}
         <View style={styles.detailsBlock}>
           <Text style={styles.categoryText}>{provider.service_categories.join(', ')}</Text>
           <View style={styles.infoRow}>
             <View style={styles.infoPill}>
               <Ionicons name="location-sharp" size={12} color="#e4eaf8" />
-              <Text style={styles.infoPillText}>{provider.area} · {provider.distance_km ? `${provider.distance_km.toFixed(1)} km` : ''}</Text>
+              <Text style={styles.infoPillText}>{provider.area}{displayDist ? ` · ${displayDist} km` : ''}</Text>
             </View>
             <View style={styles.infoPill}>
               <Ionicons name="star" size={12} color="#ffd060" />
@@ -181,19 +275,20 @@ export default function ProviderResultsScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Reasoning Log */}
+        {/* Reasoning */}
         {provider.reasoning && (
           <View style={styles.reasoningCard}>
             <Text style={styles.reasoningText}>
-              <Ionicons name="bulb-outline" size={13} color="#ffd843" /> <Text style={{ fontStyle: 'italic' }}>{provider.reasoning}</Text>
+              <Ionicons name="bulb-outline" size={13} color="#ffd843" />{' '}
+              <Text style={{ fontStyle: 'italic' }}>{provider.reasoning}</Text>
             </Text>
           </View>
         )}
 
-        {/* Expanded Progress Metrics */}
+        {/* Score Bars */}
         {renderScoreBars(provider)}
 
-        {/* Horizontal Available Slots pills */}
+        {/* Slots */}
         {slots.length > 0 ? (
           <View style={styles.slotsSection}>
             <Text style={styles.slotsTitle}>Select Time Slot:</Text>
@@ -218,27 +313,38 @@ export default function ProviderResultsScreen({ navigation, route }) {
           <Text style={styles.noSlotsText}>⚠️ No active time slots available</Text>
         )}
 
-        {/* Call & Booking Actions */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity 
-            style={styles.callBtn} 
-            onPress={() => handleCall(provider.phone || '03001234567')}
+        {/* View on Map Button */}
+        {provider.lat && provider.lng && (
+          <TouchableOpacity
+            style={[styles.viewOnMapBtn, isRouteActive && styles.viewOnMapBtnActive]}
+            onPress={() => handleViewOnMap(provider)}
           >
+            <Ionicons
+              name='map-outline'
+              size={15}
+              color='#00D4A8'
+              style={{ marginRight: 7 }}
+            />
+            <Text style={styles.viewOnMapBtnText}>
+              {`View on Map${displayDist ? '  ·  ' + displayDist + ' km' + (displayDrive ? '  ·  ~' + displayDrive + ' min' : '') : ''}`}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Actions */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.callBtn} onPress={() => handleCall(provider.phone || '03001234567')}>
             <Ionicons name="call" size={16} color="#3b9eff" style={{ marginRight: 6 }} />
             <Text style={styles.callBtnText}>Call Expert</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.bookBtn, (!provider.available || slots.length === 0) && styles.disabledBtn]} 
+          <TouchableOpacity
+            style={[styles.bookBtn, (!provider.available || slots.length === 0) && styles.disabledBtn]}
             disabled={!provider.available || slots.length === 0}
             onPress={() => initiateBooking(provider)}
           >
-            <Text style={styles.bookBtnText}>
-              {provider.available ? 'Book Service' : 'Currently Busy'}
-            </Text>
+            <Text style={styles.bookBtnText}>{provider.available ? 'Book Service' : 'Currently Busy'}</Text>
           </TouchableOpacity>
         </View>
-
       </View>
     );
   };
@@ -246,12 +352,14 @@ export default function ProviderResultsScreen({ navigation, route }) {
   if (!top_match) {
     return (
       <SafeAreaView style={styles.container}>
+        {/* Fix #10: Back button on empty state */}
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color="#FFF" />
+        </TouchableOpacity>
         <View style={styles.emptyState}>
           <Ionicons name="alert-circle-outline" size={80} color="#ff4a4a" />
           <Text style={styles.emptyTitle}>No Matching Experts</Text>
-          <Text style={styles.emptyText}>
-            No service providers were found for "{serviceType}". Try adjusting your prompt.
-          </Text>
+          <Text style={styles.emptyText}>No service providers were found for "{serviceType}". Try adjusting your prompt.</Text>
           <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.popToTop()}>
             <Text style={styles.emptyBtnText}>Try Again</Text>
           </TouchableOpacity>
@@ -260,6 +368,7 @@ export default function ProviderResultsScreen({ navigation, route }) {
     );
   }
 
+<<<<<<< Updated upstream
   // Map data helpers
   const providerLat = top_match?.lat;
   const providerLng = top_match?.lng;
@@ -270,34 +379,53 @@ export default function ProviderResultsScreen({ navigation, route }) {
   const midLng = hasMapData ? (userLng + providerLng) / 2 : userLng;
   const latDelta = hasMapData ? Math.abs(userLat - providerLat) * 2.2 + 0.01 : 0.05;
   const lngDelta = hasMapData ? Math.abs(userLng - providerLng) * 2.2 + 0.01 : 0.05;
+=======
+  // Route distance info for banner
+  const routeInfo = activeRouteProvider
+    ? calcDistanceInfo(user_lat, user_lng, activeRouteProvider.lat, activeRouteProvider.lng)
+    : {};
+  const routeDist = activeRouteProvider?.distance_km || routeInfo.km;
+  const routeDriveMins = activeRouteProvider?.distance_km
+    ? Math.round((activeRouteProvider.distance_km / CITY_SPEED_KMH) * 60)
+    : routeInfo.driveMins;
+  // Fix #1: walk mins now actually used in banner
+  const routeWalkMins = routeInfo.walkMins;
+>>>>>>> Stashed changes
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        
-        {/* Intent Info Bar */}
-        <View style={styles.header}>
+      <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+        {/* Fix #10: Back button header */}
+        <View style={styles.screenHeader}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={22} color="#FFF" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>Matching Experts</Text>
-          <View style={styles.intentInfoCard}>
-            <View style={styles.intentLabelRow}>
-              <Ionicons name="bulb" size={14} color="#00D4A8" style={{ marginRight: 6 }} />
-              <Text style={styles.intentLabel} numberOfLines={1}>
-                You asked for: <Text style={{ color: '#FFF', fontWeight: 'bold' }}>{serviceType}</Text>
-              </Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        {/* Intent Bar */}
+        <View style={styles.intentInfoCard}>
+          <View style={styles.intentLabelRow}>
+            <Ionicons name="bulb" size={14} color="#00D4A8" style={{ marginRight: 6 }} />
+            <Text style={styles.intentLabel} numberOfLines={1}>
+              You asked for: <Text style={{ color: '#FFF', fontWeight: 'bold' }}>{serviceType}</Text>
+            </Text>
+          </View>
+          <View style={styles.intentSubPills}>
+            <View style={styles.miniTag}>
+              <Ionicons name="calendar-outline" size={10} color="#8fa3c0" style={{ marginRight: 3 }} />
+              <Text style={styles.miniTagText}>{timeLabel}</Text>
             </View>
-            <View style={styles.intentSubPills}>
-              <View style={styles.miniTag}>
-                <Ionicons name="calendar-outline" size={10} color="#8fa3c0" style={{ marginRight: 3 }} />
-                <Text style={styles.miniTagText}>{timeLabel}</Text>
-              </View>
-              <View style={styles.miniTag}>
-                <Ionicons name="language" size={10} color="#8fa3c0" style={{ marginRight: 3 }} />
-                <Text style={styles.miniTagText}>{langLabel}</Text>
-              </View>
+            <View style={styles.miniTag}>
+              <Ionicons name="language" size={10} color="#8fa3c0" style={{ marginRight: 3 }} />
+              <Text style={styles.miniTagText}>{langLabel}</Text>
             </View>
           </View>
         </View>
 
+<<<<<<< Updated upstream
         {/* ─── List / Map Toggle ─── */}
         {hasMapData && (
           <View style={styles.viewToggleBar}>
@@ -407,20 +535,134 @@ export default function ProviderResultsScreen({ navigation, route }) {
         )}
 
         {/* Top Matches Section */}
+=======
+        {/* ── MAP SECTION — Fix #7: dynamic height ── */}
+        <View style={[styles.mapContainerWrapper, { height: mapHeight }]}>
+          <MapView
+            ref={mapRef}
+            provider={PROVIDER_GOOGLE}
+            style={styles.resultsMap}
+            initialRegion={{
+              latitude: user_lat || 33.6938,
+              longitude: user_lng || 72.9720,
+              latitudeDelta: 0.1,
+              longitudeDelta: 0.1,
+            }}
+          >
+            {/* User marker */}
+            <Marker coordinate={{ latitude: user_lat || 33.6938, longitude: user_lng || 72.9720 }} title="Your Location">
+              <View style={styles.userMarker}>
+                <Ionicons name="person" size={16} color="#FFF" />
+              </View>
+            </Marker>
+
+            {/* Top match marker */}
+            {top_match?.lat && top_match?.lng && (
+              <Marker
+                coordinate={{ latitude: top_match.lat, longitude: top_match.lng }}
+                title={top_match.name}
+                description="Top Match"
+                onPress={() => handleMarkerPress(top_match)}
+              >
+                <View style={[styles.topMatchMarker, activeRouteProvider?.id === top_match.id && styles.markerHighlighted]}>
+                  <Ionicons name="star" size={12} color="#050810" />
+                </View>
+              </Marker>
+            )}
+
+            {/* Alternative markers */}
+            {validAlternatives.map(provider => {
+              if (!provider.lat || !provider.lng) return null;
+              return (
+                <Marker
+                  key={provider.id}
+                  coordinate={{ latitude: provider.lat, longitude: provider.lng }}
+                  title={provider.name}
+                  description={provider.service_categories.join(', ')}
+                  onPress={() => handleMarkerPress(provider)}
+                >
+                  <View style={[styles.altMarker, activeRouteProvider?.id === provider.id && styles.markerHighlighted]}>
+                    <Text style={styles.altMarkerText}>{provider.rating ? provider.rating.toFixed(1) : ''}</Text>
+                  </View>
+                </Marker>
+              );
+            })}
+
+            {/* Dashed route line */}
+            {activeRouteProvider?.lat && activeRouteProvider?.lng && user_lat && user_lng && (
+              <Polyline
+                coordinates={[
+                  { latitude: user_lat, longitude: user_lng },
+                  { latitude: activeRouteProvider.lat, longitude: activeRouteProvider.lng },
+                ]}
+                strokeColor="#3b9eff"
+                strokeWidth={2.5}
+                lineDashPattern={[8, 5]}
+              />
+            )}
+          </MapView>
+
+          {/* Distance Banner — Fix #1: walk mins now shown */}
+          {activeRouteProvider && (
+            <View style={styles.distanceBanner}>
+              <View style={styles.distanceBannerLeft}>
+                <Ionicons name="navigate" size={15} color="#3b9eff" />
+                <Text style={styles.distanceBannerName} numberOfLines={1}>
+                  {activeRouteProvider.name}
+                </Text>
+              </View>
+              <View style={styles.distanceBannerRight}>
+                {routeDist && (
+                  <View style={styles.distancePill}>
+                    <Ionicons name="location" size={11} color="#00D4A8" />
+                    <Text style={styles.distancePillText}>{routeDist} km</Text>
+                  </View>
+                )}
+                {routeDriveMins && (
+                  <View style={[styles.distancePill, { backgroundColor: 'rgba(59,158,255,0.13)' }]}>
+                    <Ionicons name="car" size={11} color="#3b9eff" />
+                    <Text style={[styles.distancePillText, { color: '#3b9eff' }]}>~{routeDriveMins} min</Text>
+                  </View>
+                )}
+                {routeWalkMins && routeWalkMins <= 60 && (
+                  <View style={[styles.distancePill, { backgroundColor: 'rgba(255,208,96,0.13)' }]}>
+                    <Ionicons name="walk" size={11} color="#ffd060" />
+                    <Text style={[styles.distancePillText, { color: '#ffd060' }]}>~{routeWalkMins} min</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Map Legend */}
+          <View style={styles.mapLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#3b9eff' }]} />
+              <Text style={styles.legendText}>You</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#ffd843' }]} />
+              <Text style={styles.legendText}>Best Match</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#00D4A8' }]} />
+              <Text style={styles.legendText}>Others</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Top Match */}
+>>>>>>> Stashed changes
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>🏆 Top Matches Recommended</Text>
         </View>
-        
         {renderProviderCard(top_match, true)}
 
-        {/* Alternatives Section */}
+        {/* Alternatives */}
         {validAlternatives.length > 0 && (
           <View style={styles.alternativesSection}>
             {!expanded ? (
-              <TouchableOpacity 
-                style={styles.expandBtn} 
-                onPress={() => setExpanded(true)}
-              >
+              <TouchableOpacity style={styles.expandBtn} onPress={() => setExpanded(true)}>
                 <Text style={styles.expandBtnText}>Show {validAlternatives.length} more options</Text>
                 <Ionicons name="chevron-down" size={18} color="#00D4A8" style={{ marginLeft: 6 }} />
               </TouchableOpacity>
@@ -430,11 +672,7 @@ export default function ProviderResultsScreen({ navigation, route }) {
                   <Text style={styles.sectionTitle}>Alternative Providers</Text>
                 </View>
                 {displayProviders.map(provider => renderProviderCard(provider, false))}
-                
-                <TouchableOpacity 
-                  style={styles.expandBtn} 
-                  onPress={() => setExpanded(false)}
-                >
+                <TouchableOpacity style={styles.expandBtn} onPress={() => setExpanded(false)}>
                   <Text style={styles.expandBtnText}>Collapse options</Text>
                   <Ionicons name="chevron-up" size={18} color="#00D4A8" style={{ marginLeft: 6 }} />
                 </TouchableOpacity>
@@ -445,80 +683,82 @@ export default function ProviderResultsScreen({ navigation, route }) {
 
       </ScrollView>
 
-      {/* Floating Agent Trace Button */}
-      <TouchableOpacity 
-        style={styles.traceFab}
-        onPress={() => navigation.navigate('AgentTrace', { session_id })}
-      >
+      {/* Agent Trace FAB */}
+      <TouchableOpacity style={styles.traceFab} onPress={() => navigation.navigate('AgentTrace', { session_id })}>
         <Ionicons name="hardware-chip" size={24} color="#050810" />
         <Text style={styles.traceFabText}>Agent Trace</Text>
       </TouchableOpacity>
 
-      {/* Booking Form Overlay Sheet Modal */}
+      {/* Booking Modal */}
       <Modal
         visible={bookingModalVisible}
-        transparent={true}
+        transparent
         animationType="slide"
-        onRequestClose={() => setBookingModalVisible(false)}
+        onRequestClose={() => {
+          setBookingModalVisible(false);
+          // Fix #3: clear on dismiss too
+          setBookingProvider(null);
+        }}
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalSheet}>
-            
-            {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Confirm Booking details</Text>
-              <TouchableOpacity onPress={() => setBookingModalVisible(false)} disabled={bookingLoading}>
+              <Text style={styles.modalTitle}>Confirm Booking</Text>
+              <TouchableOpacity
+                onPress={() => { setBookingModalVisible(false); setBookingProvider(null); }}
+                disabled={bookingLoading}
+              >
                 <Ionicons name="close" size={24} color="#8fa3c0" />
               </TouchableOpacity>
             </View>
-
             {bookingProvider && (
-              <ScrollView style={styles.modalScroll}>
-                {/* Summary Info */}
+              <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
                 <View style={styles.modalSummaryBox}>
                   <Text style={styles.summaryLabel}>Provider</Text>
                   <Text style={styles.summaryValue}>{bookingProvider.name}</Text>
-
                   <Text style={[styles.summaryLabel, { marginTop: 10 }]}>Category</Text>
                   <Text style={styles.summaryValue}>{bookingProvider.service_categories.join(', ')}</Text>
-
                   <Text style={[styles.summaryLabel, { marginTop: 10 }]}>Selected Time</Text>
-                  <Text style={styles.summaryValueSelected}>
-                    {formatSlot(selectedSlots[bookingProvider.id])}
-                  </Text>
+                  <Text style={styles.summaryValueSelected}>{formatSlot(selectedSlots[bookingProvider.id])}</Text>
                 </View>
 
-                {/* Form Fields */}
-                <Text style={styles.inputLabel}>Your Name</Text>
+                {/* Fix #4: Empty placeholders, user must fill */}
+                <Text style={styles.inputLabel}>Your Name <Text style={{ color: '#ff6b6b' }}>*</Text></Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="Enter your name"
+                  placeholder="Enter your full name"
                   placeholderTextColor="#5a6a85"
                   value={userName}
                   onChangeText={setUserName}
                   editable={!bookingLoading}
+                  autoCapitalize="words"
                 />
 
-                <Text style={styles.inputLabel}>Phone Number</Text>
+                {/* Fix #9: Phone hint + validation */}
+                <Text style={styles.inputLabel}>Phone Number <Text style={{ color: '#ff6b6b' }}>*</Text></Text>
                 <TextInput
-                  style={styles.formInput}
-                  placeholder="e.g. 03001234567"
+                  style={[
+                    styles.formInput,
+                    userPhone.length > 0 && !isValidPhone(userPhone) && styles.formInputError
+                  ]}
+                  placeholder="03XXXXXXXXX"
                   placeholderTextColor="#5a6a85"
                   keyboardType="phone-pad"
+                  maxLength={11}
                   value={userPhone}
                   onChangeText={setUserPhone}
                   editable={!bookingLoading}
                 />
+                {userPhone.length > 0 && !isValidPhone(userPhone) && (
+                  <Text style={styles.inputError}>Format: 03XXXXXXXXX (11 digits)</Text>
+                )}
 
-                {/* Confirm Button */}
-                <TouchableOpacity 
-                  style={[styles.confirmBookBtn, bookingLoading && styles.confirmBookBtnDisabled]} 
+                <TouchableOpacity
+                  style={[styles.confirmBookBtn, bookingLoading && styles.confirmBookBtnDisabled]}
                   onPress={handleConfirmBooking}
                   disabled={bookingLoading}
                 >
-                  {bookingLoading ? (
-                    <ActivityIndicator size="small" color="#050810" />
-                  ) : (
+                  {bookingLoading ? <ActivityIndicator size="small" color="#050810" /> : (
                     <>
                       <Ionicons name="checkmark-circle-sharp" size={20} color="#050810" style={{ marginRight: 6 }} />
                       <Text style={styles.confirmBookBtnText}>Complete Booking</Text>
@@ -527,11 +767,9 @@ export default function ProviderResultsScreen({ navigation, route }) {
                 </TouchableOpacity>
               </ScrollView>
             )}
-
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   );
 }
@@ -550,6 +788,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#050810' },
   scrollContent: { padding: 16, paddingBottom: 100 },
 
+<<<<<<< Updated upstream
   // Map Card
   mapCard: {
     backgroundColor: '#0b0f1a',
@@ -614,158 +853,111 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)'
   },
+=======
+  // Fix #10: screen header with back button
+  screenHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, marginTop: 4 },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.06)', justifyContent: 'center', alignItems: 'center' },
+  headerTitle: { fontSize: 22, fontWeight: '900', color: '#FFF', letterSpacing: -0.5 },
+
+  intentInfoCard: { backgroundColor: '#0b0f1a', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', marginBottom: 16 },
+>>>>>>> Stashed changes
   intentLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   intentLabel: { color: '#8fa3c0', fontSize: 14, flex: 1 },
   intentSubPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  miniTag: { 
-    flexDirection: 'row', alignItems: 'center', 
-    backgroundColor: '#161f30', 
-    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 
-  },
+  miniTag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#161f30', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   miniTagText: { color: '#8fa3c0', fontSize: 11, fontWeight: '500' },
-  
+
+  // Fix #7: height is dynamic via inline style
+  mapContainerWrapper: { width: '100%', borderRadius: 16, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  resultsMap: { width: '100%', height: '100%' },
+  userMarker: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#3b9eff', justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, borderColor: '#fff' },
+  topMatchMarker: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#ffd843', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#050810' },
+  altMarker: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#00D4A8', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#050810' },
+  altMarkerText: { fontSize: 8, fontWeight: '900', color: '#050810' },
+  markerHighlighted: { transform: [{ scale: 1.4 }], borderColor: '#fff', borderWidth: 2.5 },
+
+  distanceBanner: {
+    position: 'absolute', top: 10, left: 10, right: 10,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: 'rgba(5,8,16,0.9)', borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 8,
+    borderWidth: 1, borderColor: 'rgba(59,158,255,0.4)',
+  },
+  distanceBannerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 },
+  distanceBannerName: { color: '#FFF', fontSize: 12, fontWeight: '700', marginLeft: 7, flex: 1 },
+  distanceBannerRight: { flexDirection: 'row', gap: 5 },
+  distancePill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,212,168,0.13)', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 8 },
+  distancePillText: { color: '#00D4A8', fontSize: 10, fontWeight: '700' },
+
+  mapLegend: { position: 'absolute', bottom: 8, left: 10, flexDirection: 'row', gap: 10, backgroundColor: 'rgba(5,8,16,0.75)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { color: '#e4eaf8', fontSize: 10, fontWeight: '600' },
+
   sectionHeader: { marginVertical: 14, paddingLeft: 4 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#8fa3c0', textTransform: 'uppercase', letterSpacing: 0.5 },
-  
-  card: { 
-    backgroundColor: '#111827', 
-    borderRadius: 20, 
-    padding: 18, 
-    marginBottom: 20, 
-    borderWidth: 1, 
-    borderColor: 'rgba(255,255,255,0.06)',
-    elevation: 4
-  },
-  bestMatchCard: { 
-    borderColor: '#00D4A8', 
-    borderWidth: 1.5,
-    backgroundColor: '#0d1d26'
-  },
-  
+  card: { backgroundColor: '#111827', borderRadius: 20, padding: 18, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', elevation: 4 },
+  bestMatchCard: { borderColor: '#00D4A8', borderWidth: 1.5, backgroundColor: '#0d1d26' },
+  cardHighlighted: { borderColor: '#3b9eff', borderWidth: 2, backgroundColor: '#0b1525' },
+
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  profileAvatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(59, 158, 255, 0.15)',
-    justifyContent: 'center', alignItems: 'center', marginRight: 14,
-    borderWidth: 1, borderColor: 'rgba(59, 158, 255, 0.3)'
-  },
+  profileAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(59,158,255,0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 14, borderWidth: 1, borderColor: 'rgba(59,158,255,0.3)' },
   avatarText: { color: '#3b9eff', fontWeight: 'bold', fontSize: 18, textTransform: 'uppercase' },
   headerInfo: { flex: 1 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
   name: { fontSize: 18, fontWeight: 'bold', color: '#FFF', flex: 1, marginRight: 8 },
-  scoreBadge: {
-    backgroundColor: 'rgba(0, 212, 168, 0.12)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 168, 0.25)'
-  },
+  scoreBadge: { backgroundColor: 'rgba(0,212,168,0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(0,212,168,0.25)' },
   scoreBadgeText: { color: '#00D4A8', fontSize: 12, fontWeight: '800' },
-  
   badgeRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  bestMatchBadge: { 
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#ffd843', 
-    paddingHorizontal: 6, paddingVertical: 2, 
-    borderRadius: 6
-  },
+  bestMatchBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffd843', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   bestMatchBadgeText: { color: '#050810', fontSize: 9, fontWeight: '900' },
-  
   statusTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  statusOnline: { backgroundColor: 'rgba(0, 212, 168, 0.1)' },
-  statusOffline: { backgroundColor: 'rgba(255, 74, 74, 0.1)' },
+  statusOnline: { backgroundColor: 'rgba(0,212,168,0.1)' },
+  statusOffline: { backgroundColor: 'rgba(255,74,74,0.1)' },
   statusTagText: { fontSize: 9, fontWeight: '800', color: '#FFF' },
-  
+
   detailsBlock: { marginBottom: 14 },
   categoryText: { color: '#00D4A8', fontSize: 13, fontWeight: '700', marginBottom: 8 },
   infoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  infoPill: { 
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1b2336',
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)'
-  },
+  infoPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1b2336', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   infoPillText: { color: '#e4eaf8', fontSize: 11, marginLeft: 4, fontWeight: '500' },
-  
-  reasoningCard: {
-    backgroundColor: 'rgba(255, 216, 67, 0.05)',
-    borderLeftWidth: 3,
-    borderLeftColor: '#ffd843',
-    padding: 10,
-    borderRadius: 6,
-    marginBottom: 14,
-  },
+
+  reasoningCard: { backgroundColor: 'rgba(255,216,67,0.05)', borderLeftWidth: 3, borderLeftColor: '#ffd843', padding: 10, borderRadius: 6, marginBottom: 14 },
   reasoningText: { color: '#e4eaf8', fontSize: 12, lineHeight: 18 },
-  
-  scoreBarsSection: {
-    marginVertical: 10,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    padding: 10,
-    borderRadius: 10
-  },
+
+  scoreBarsSection: { marginVertical: 10, backgroundColor: 'rgba(255,255,255,0.02)', padding: 10, borderRadius: 10 },
   scoreBarRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 3 },
   scoreBarLabel: { color: '#8fa3c0', fontSize: 10, width: 75, fontWeight: '500' },
   scoreBarBg: { flex: 1, height: 5, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 3, overflow: 'hidden', marginHorizontal: 8 },
   scoreBarFill: { height: '100%', borderRadius: 3 },
   scoreBarVal: { color: '#FFF', fontSize: 10, fontWeight: '600', width: 20, textAlign: 'right' },
-  
+
   slotsSection: { marginVertical: 12 },
   slotsTitle: { color: '#8fa3c0', fontSize: 11, fontWeight: '600', marginBottom: 6, textTransform: 'uppercase' },
   slotsScroll: { gap: 8, paddingVertical: 2 },
-  slotPill: {
-    backgroundColor: '#1b2336',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)'
-  },
-  slotPillSelected: {
-    backgroundColor: 'rgba(0, 212, 168, 0.1)',
-    borderColor: '#00D4A8',
-  },
+  slotPill: { backgroundColor: '#1b2336', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  slotPillSelected: { backgroundColor: 'rgba(0,212,168,0.1)', borderColor: '#00D4A8' },
   slotText: { color: '#8fa3c0', fontSize: 12, fontWeight: '600' },
   slotTextSelected: { color: '#00D4A8' },
   noSlotsText: { color: '#ff4a4a', fontSize: 11, fontWeight: '600', marginVertical: 10 },
 
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  callBtn: { 
-    flexDirection: 'row', flex: 1, backgroundColor: 'rgba(59, 158, 255, 0.08)', 
-    paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(59, 158, 255, 0.25)'
-  },
+  viewOnMapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,212,168,0.07)', borderWidth: 1, borderColor: 'rgba(0,212,168,0.25)', borderRadius: 10, paddingVertical: 10, marginBottom: 12 },
+  viewOnMapBtnActive: { backgroundColor: '#3b9eff', borderColor: '#3b9eff' },
+  viewOnMapBtnText: { color: '#00D4A8', fontSize: 12, fontWeight: '700' },
+  viewOnMapBtnTextActive: { color: '#fff' },
+
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  callBtn: { flexDirection: 'row', flex: 1, backgroundColor: 'rgba(59,158,255,0.08)', paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(59,158,255,0.25)' },
   callBtnText: { color: '#3b9eff', fontWeight: 'bold', fontSize: 13 },
-  bookBtn: { 
-    flex: 1.4, backgroundColor: '#00D4A8', 
-    paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center'
-  },
+  bookBtn: { flex: 1.4, backgroundColor: '#00D4A8', paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   disabledBtn: { backgroundColor: '#3a4a65', opacity: 0.5 },
   bookBtnText: { color: '#050810', fontWeight: '800', fontSize: 14 },
-  
+
   alternativesSection: { marginTop: 10 },
-  expandBtn: { 
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#0b0f1a', padding: 14, borderRadius: 14,
-    borderWidth: 1, borderColor: 'rgba(0, 212, 168, 0.15)', marginVertical: 10
-  },
+  expandBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0b0f1a', padding: 14, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(0,212,168,0.15)', marginVertical: 10 },
   expandBtnText: { color: '#00D4A8', fontSize: 14, fontWeight: 'bold' },
 
-  traceFab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    flexDirection: 'row',
-    backgroundColor: '#ffd843',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 28,
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 }
-  },
+  traceFab: { position: 'absolute', bottom: 24, right: 24, flexDirection: 'row', backgroundColor: '#ffd843', paddingVertical: 14, paddingHorizontal: 20, borderRadius: 28, alignItems: 'center', elevation: 8, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 10, shadowOffset: { width: 0, height: 6 } },
   traceFabText: { color: '#050810', fontWeight: '850', fontSize: 14, marginLeft: 6 },
 
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
@@ -774,57 +966,20 @@ const styles = StyleSheet.create({
   emptyBtn: { backgroundColor: '#00D4A8', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12 },
   emptyBtnText: { color: '#050810', fontWeight: 'bold', fontSize: 16 },
 
-  // Modal styling
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(5, 8, 16, 0.85)', justifyContent: 'flex-end' },
-  modalSheet: { 
-    backgroundColor: '#111827', 
-    borderTopLeftRadius: 24, 
-    borderTopRightRadius: 24, 
-    padding: 24, 
-    maxHeight: '80%',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)'
-  },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(5,8,16,0.85)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#111827', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold' },
   modalScroll: { marginBottom: 10 },
-  modalSummaryBox: {
-    backgroundColor: '#0b0f1a',
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-    marginBottom: 20
-  },
+  modalSummaryBox: { backgroundColor: '#0b0f1a', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)', marginBottom: 20 },
   summaryLabel: { color: '#5a6a85', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
   summaryValue: { color: '#FFF', fontSize: 15, fontWeight: '600', marginTop: 2, marginBottom: 8 },
   summaryValueSelected: { color: '#00D4A8', fontSize: 15, fontWeight: '750', marginTop: 2 },
-  
   inputLabel: { color: '#8fa3c0', fontSize: 13, fontWeight: '600', marginBottom: 8 },
-  formInput: {
-    backgroundColor: '#0b0f1a',
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderRadius: 12,
-    color: '#FFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    marginBottom: 20
-  },
-  confirmBookBtn: {
-    flexDirection: 'row',
-    backgroundColor: '#00D4A8',
-    paddingVertical: 16,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20
-  },
-  confirmBookBtnDisabled: {
-    backgroundColor: '#3a4a65',
-    opacity: 0.7
-  },
-  confirmBookBtnText: { color: '#050810', fontSize: 16, fontWeight: '850' }
+  formInput: { backgroundColor: '#0b0f1a', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderRadius: 12, color: '#FFF', paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, marginBottom: 6 },
+  formInputError: { borderColor: '#ff6b6b', borderWidth: 1.5 },
+  inputError: { color: '#ff6b6b', fontSize: 11, marginBottom: 14, marginLeft: 4 },
+  confirmBookBtn: { flexDirection: 'row', backgroundColor: '#00D4A8', paddingVertical: 16, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginTop: 14, marginBottom: 20 },
+  confirmBookBtnDisabled: { backgroundColor: '#3a4a65', opacity: 0.7 },
+  confirmBookBtnText: { color: '#050810', fontSize: 16, fontWeight: '850' },
 });

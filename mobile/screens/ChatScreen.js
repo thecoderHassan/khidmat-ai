@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 🎤  REAL VOICE RECORDING + GEMINI TRANSCRIPTION
@@ -59,9 +60,6 @@ const uploadAudioForTranscription = async (audioUri) => {
 
     const response = await fetch(`${BASE_URL}/api/transcribe`, {
       method: 'POST',
-      headers: {
-        'ngrok-skip-browser-warning': 'true',
-      },
       body: formData,
     });
 
@@ -87,7 +85,6 @@ const callAntigravityVoiceIntent = async (voiceText, location, sessionId) => {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({
         session_id: sessionId,
@@ -118,6 +115,13 @@ export default function ChatScreen({ navigation, route }) {
 
   const [coordinates, setCoordinates] = useState({ lat: 33.6938, lng: 72.9720 });
   const [loadingLocation, setLoadingLocation] = useState(false);
+  
+  // Map Selection States
+  const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchingLocation, setSearchingLocation] = useState(false);
+  const [tempCoordinates, setTempCoordinates] = useState({ lat: 33.6938, lng: 72.9720 });
+  const mapRef = useRef(null);
   
   const [placeholderText, setPlaceholderText] = useState('');
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -346,20 +350,80 @@ export default function ChatScreen({ navigation, route }) {
       if (status !== 'granted') {
         if (!silent) Alert.alert("Location Permission Denied", "We will use the default G-13 Islamabad coordinates for matching.", [{ text: "OK" }]);
         setCoordinates({ lat: 33.6938, lng: 72.9720 });
+        setTempCoordinates({ lat: 33.6938, lng: 72.9720 });
         setLocationStr("G-13, Islamabad (Default Fallback)");
+        if (!silent) setMapModalVisible(true);
         return { lat: 33.6938, lng: 72.9720 };
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const currentCoords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
       setCoordinates(currentCoords);
-      setLocationStr(`GPS Active: ${currentCoords.lat.toFixed(4)}, ${currentCoords.lng.toFixed(4)}`);
+      setTempCoordinates(currentCoords);
+      
+      const geocode = await Location.reverseGeocodeAsync({ latitude: currentCoords.lat, longitude: currentCoords.lng });
+      if (geocode && geocode.length > 0) {
+        const place = geocode[0];
+        const addr = `${place.name || place.street || ''} ${place.district || place.city || ''}`.trim();
+        setLocationStr(addr || `GPS Active: ${currentCoords.lat.toFixed(4)}, ${currentCoords.lng.toFixed(4)}`);
+      } else {
+        setLocationStr(`GPS Active: ${currentCoords.lat.toFixed(4)}, ${currentCoords.lng.toFixed(4)}`);
+      }
+      if (!silent) setMapModalVisible(true);
       return currentCoords;
     } catch (error) {
       setCoordinates({ lat: 33.6938, lng: 72.9720 });
+      setTempCoordinates({ lat: 33.6938, lng: 72.9720 });
       setLocationStr("G-13, Islamabad (Default Fallback)");
+      if (!silent) setMapModalVisible(true);
       return { lat: 33.6938, lng: 72.9720 };
     } finally {
       if (!silent) setLoadingLocation(false);
+    }
+  };
+
+  const handleSearchLocation = async () => {
+    if (!searchQuery.trim()) return;
+    setSearchingLocation(true);
+    try {
+      const result = await Location.geocodeAsync(searchQuery);
+      if (result && result.length > 0) {
+        const { latitude, longitude } = result[0];
+        setTempCoordinates({ lat: latitude, lng: longitude });
+        if (mapRef.current) {
+          mapRef.current.animateToRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }, 1000);
+        }
+      } else {
+        Alert.alert("Not Found", "Could not find that location. Please try a different search term.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to search location.");
+    } finally {
+      setSearchingLocation(false);
+    }
+  };
+
+  const confirmMapLocation = async () => {
+    setCoordinates(tempCoordinates);
+    setMapModalVisible(false);
+    setLoadingLocation(true);
+    try {
+      const geocode = await Location.reverseGeocodeAsync({ latitude: tempCoordinates.lat, longitude: tempCoordinates.lng });
+      if (geocode && geocode.length > 0) {
+        const place = geocode[0];
+        const addr = `${place.name || place.street || ''} ${place.district || place.city || ''}`.trim();
+        setLocationStr(addr || `Custom Location Selected`);
+      } else {
+        setLocationStr(`Custom Location Selected`);
+      }
+    } catch (e) {
+      setLocationStr(`Custom Location Selected`);
+    } finally {
+      setLoadingLocation(false);
     }
   };
 
@@ -615,6 +679,88 @@ export default function ChatScreen({ navigation, route }) {
           </View>
         </View>
       </Modal>
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          MAP LOCATION MODAL
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={mapModalVisible}
+        onRequestClose={() => setMapModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.voiceSheet, { flex: 0.9, paddingHorizontal: 0, paddingBottom: 0 }]}>
+            <View style={styles.sheetHandle} />
+            <View style={[styles.sheetHeader, { paddingHorizontal: 24 }]}>
+              <Text style={styles.sheetTitle}>📍 Set Location</Text>
+              <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setMapModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.mapSearchRow}>
+              <TextInput
+                style={styles.mapSearchInput}
+                placeholder="Search location (e.g. G-9, Islamabad)"
+                placeholderTextColor="#5a6a85"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onSubmitEditing={handleSearchLocation}
+              />
+              <TouchableOpacity style={styles.mapSearchBtn} onPress={handleSearchLocation} disabled={searchingLocation}>
+                {searchingLocation ? (
+                  <ActivityIndicator size="small" color="#050810" />
+                ) : (
+                  <Ionicons name="search" size={20} color="#050810" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.mapContainer}>
+              <MapView
+                ref={mapRef}
+                provider={PROVIDER_GOOGLE}
+                style={styles.map}
+                initialRegion={{
+                  latitude: tempCoordinates.lat,
+                  longitude: tempCoordinates.lng,
+                  latitudeDelta: 0.05,
+                  longitudeDelta: 0.05,
+                }}
+                onPress={(e) => {
+                  setTempCoordinates({
+                    lat: e.nativeEvent.coordinate.latitude,
+                    lng: e.nativeEvent.coordinate.longitude
+                  });
+                }}
+              >
+                <Marker 
+                  coordinate={{ latitude: tempCoordinates.lat, longitude: tempCoordinates.lng }}
+                  draggable
+                  onDragEnd={(e) => {
+                    setTempCoordinates({
+                      lat: e.nativeEvent.coordinate.latitude,
+                      lng: e.nativeEvent.coordinate.longitude
+                    });
+                  }}
+                >
+                  <View style={styles.mapMarker}>
+                    <Ionicons name="home" size={20} color="#FFF" />
+                  </View>
+                </Marker>
+              </MapView>
+            </View>
+
+            <View style={styles.mapConfirmBox}>
+              <Text style={styles.mapConfirmLabel}>Selected Area Coordinates:</Text>
+              <Text style={styles.mapConfirmValue}>{tempCoordinates.lat.toFixed(5)}, {tempCoordinates.lng.toFixed(5)}</Text>
+              <TouchableOpacity style={styles.mapConfirmBtn} onPress={confirmMapLocation}>
+                <Text style={styles.mapConfirmBtnText}>Confirm Location</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -673,4 +819,16 @@ const styles = StyleSheet.create({
   voicePrimaryBtnText: { color: '#050810', fontWeight: '800', fontSize: 14 },
   voiceSecondaryBtn: { flex: 1, backgroundColor: '#111827', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', paddingVertical: 14, borderRadius: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   voiceSecondaryBtnText: { color: '#8fa3c0', fontWeight: '700', fontSize: 14 },
+  mapSearchRow: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 16, gap: 10 },
+  mapSearchInput: { flex: 1, backgroundColor: '#111827', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 12, color: '#FFF', paddingHorizontal: 16, height: 50 },
+  mapSearchBtn: { width: 50, height: 50, backgroundColor: '#00D4A8', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  mapContainer: { flex: 1, overflow: 'hidden' },
+  map: { width: '100%', height: '100%' },
+  mapMarker: { width: 40, height: 40, backgroundColor: '#00D4A8', borderRadius: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#050810', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 5 },
+  mapConfirmBox: { padding: 24, backgroundColor: '#0b0f1a', borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  mapConfirmLabel: { color: '#8fa3c0', fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  mapConfirmValue: { color: '#FFF', fontSize: 16, fontWeight: '700', marginBottom: 16 },
+  mapConfirmBtn: { backgroundColor: '#3b9eff', paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+  mapConfirmBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' }
 });
+

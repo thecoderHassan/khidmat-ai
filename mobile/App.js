@@ -6,6 +6,7 @@ import ProviderResultsScreen from "./screens/ProviderResultsScreen";
 import BookingConfirmScreen from "./screens/BookingConfirmScreen";
 import AgentTraceScreen from "./screens/AgentTraceScreen";
 import AnimatedSplashScreen from "./screens/AnimatedSplashScreen";
+import ProviderMapScreen from "./screens/ProviderMapScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -34,6 +35,7 @@ export default function App() {
         <Stack.Screen name="ProviderResults" component={ProviderResultsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="BookingConfirm" component={BookingConfirmScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AgentTrace" component={AgentTraceScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ProviderMap" component={ProviderMapScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -2,19 +2,18 @@ import axios from 'axios';
 import { providersData } from '../screens/providersData';
 
 // Expo automatically loads EXPO_PUBLIC_* variables from .env files.
-// Fallback URL has been updated to the active stable Ngrok tunnel.
+// Fallback URL points to the live Google Cloud Run backend.
 // Note on Backend API Specifications (confirmed by Backend Team):
 // 1. Distance: The API returns actual distance in `provider.distance_km` (real GPS distance from user's area).
 // 2. Score scale: All scores (overall & sub-scores) are standardized on a 0-1 float scale (e.g. top_match.score = 0.85).
 // 3. Score calculation: Ranking is pre-computed on the backend using the formula: 0.40*proximity + 0.40*rating + 0.20*availability.
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "https://tastiness-silly-strife.ngrok-free.dev";
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || "https://khidmat-ai-backend-bdg7lrfdza-el.a.run.app";
 
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 10000, // Reduced from 30s to 10s for faster local fallback response
   headers: {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': '1',
   },
 });
 
@@ -263,8 +262,7 @@ export const getFollowupActions = async (bookingId) => {
       actions: [
         { action: "reminder", label: "Set Reminder", payload: {} },
         { action: "contact", label: "Contact Expert", payload: { phone: "03001234567" } },
-        { action: "rebook", label: "Rebook Service", payload: {} },
-        { action: "rate_service", label: "Rate Service", payload: {} }
+        { action: "book_another", label: "Book Another Service", payload: {} }
       ]
     };
   }
@@ -310,16 +308,24 @@ export const completeBooking = async (bookingId) => {
 };
 
 /**
- * Fetch details of a single booking.
+ * Cancel a confirmed booking with a reason.
+ * Only valid when booking status is 'confirmed'.
  * @param {string} bookingId - The booking reference ID.
+ * @param {string} reason - User-provided cancellation reason.
  */
-export const getBookingDetails = async (bookingId) => {
+export const cancelBooking = async (bookingId, reason) => {
   try {
-    const response = await api.get(`/api/bookings/${bookingId}`);
+    const response = await api.patch(`/api/bookings/${bookingId}/cancel`, { reason });
     return response.data;
   } catch (error) {
-    console.warn("⚠️ API getBookingDetails failed or backend down. Using current active booking state.");
-    return null;
+    console.warn("⚠️ API cancelBooking failed or backend down. Simulating cancellation locally...");
+    return {
+      booking: {
+        booking_id: bookingId,
+        status: "cancelled",
+        cancellation_reason: reason
+      }
+    };
   }
 };
 
